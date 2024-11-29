@@ -664,3 +664,16 @@ summary(coxmodel)
 phtest <- cox.zph(coxmodel)
 print(phtest)
 
+### WilcoxTest to test if there is a significant difference ###
+wilcox.icu <- wilcox.test(ICU_LOS ~ Transfusion, data = test)
+icu.p <- wilcox.icu$p.value
+
+wilcox.hos <- wilcox.test(HOSPITAL_LOS ~ Transfusion, data = test)
+hos.p <- wilcox.hos$p.value
+
+wilcox.icu.massive <- wilcox.test(ICU_LOS ~ Massive_Transfusion, data = test)
+icu.p.massive <- wilcox.icu.massive$p.value
+
+wilcox.hos.massive <- wilcox.test(HOSPITAL_LOS ~ Massive_Transfusion, data = test)
+hos.p.massive <- wilcox.hos.massive$p.value
+
