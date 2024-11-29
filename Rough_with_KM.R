@@ -6,6 +6,7 @@ library(readxl)
 library(dplyr)
 library(ggplot2)
 library(survival)
+library(survminer)
 library(car)
 library(funModeling)
 library(corrplot)
@@ -177,6 +178,11 @@ ggplot(data, aes(x = Pre_PTT)) +
   theme_minimal()
 #' Right skewed
 
+
+###
+### Tailor EDA to answer first part of first question
+### Characteristics of patients that require transfusions.
+###
 
 #' Additional cleaning and Imputation
 
@@ -492,20 +498,27 @@ optimal_mse_mt <- cv_lasso_mt$cvm[cv_lasso_mt$lambda == optimal_lambda]
 optimal_coefs_mt <- coef(cv_lasso_mt, s = "lambda.min")
 print(optimal_coefs_mt)
 
+###
+### Combine Transfusion and Massive Transfusion into one variable with 3 levels. 
+### Make one Lasso.
+###
 
+###
+### Be ready to answer the question: 
+### Why Lasso, why not tree, why not logistic/linear regression?
+###
 
 ######################### q2 baby
-
-# Load necessary libraries
-library(survival)
-library(survminer)
-library(dplyr)
 
 # Ensure date columns are in Date format
 data$OR_Date <- as.Date(data$OR_Date)
 
 data$DEATH_DATE <- as.Date(data$DEATH_DATE, format = "%d-%b-%Y")
 
+###
+### Is it safe to assume that the last day of follow up is the last recorded date of death?
+### Some patients have date of death recorded after their 12 month follow up.
+###
 
 # Define a cutoff date for censoring (e.g., date of last follow-up)
 # Here, we'll use the latest date available in the dataset or a specified date
