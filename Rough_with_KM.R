@@ -1,3 +1,5 @@
+#' Final Project
+#' Prepared by Mausam, Ahmed, and Vian.
 
 #' Load necessary libraries
 library(readxl)
