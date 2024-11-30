@@ -302,155 +302,19 @@ xyplot(imputed111, Pre_PTT ~ Pre_Hct)
 
 
 #' Analysis 
-
-
-
-################# LASSO CLASSIFICATION
-
-#' Next we are going to identify the predictors that 
-#' we will be using in the Lasso classification model. 
-x <- c(
-  "Type", "Gender", "Height", "Weight", "Age", "BMI", "COPD",
-  "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
-  "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
-  "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
-  "Preoperative_ECLS", "LAS_score", "Pre_Hb", "Pre_Hct",
-  "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_PTT", "Pre_Creatinine"
-)
-
-#' Subsetting the model data
-model1data <- data[, c(x, "Transfusion")]
-
-#' Next we need to make the matrix for the predictors, 
-#' with dummy variables.
-x <- model.matrix(Transfusion ~ ., data = model1data)
-
-y <- as.numeric(model1data$Transfusion) - 1
-
-#' Train the model (hopefully it works lol)
-
-modelxx1 <- glmnet(x, y, family = "binomial")
-plot(modelxx1,label = T, xvar = "lambda")
-
-# Define 27 custom hex colors
-colours <- c(
-  "#195d90", "#297022", "#b91c16", "#cc6600", "#52267d", "#8c4a20", "#7ca6c2",
-  "#8eb072", "#c47272", "#cc9933", "#9b94ac", "#cccc66", "#6da395", "#cccc80",
-  "#958094", "#cc665b", "#6686a4", "#cc8a4e", "#8aa24f", "#cc9ab5", "#a1a1a1",
-  "#9c66a1", "#a2cca0", "#ccba59", "#52907e", "#cc7250", "#6e80a4"
-)
-
-# Plot the Lasso paths 
-plot(
-  modelxx1, xvar = "lambda", label = TRUE, col = colours, 
-  lwd = 1,
-  main = "Lasso Paths",
-  xlab = "log(Lambda)", ylab = "Coefficients"
-)
-
-# Create a legend
-legend(
-  "topright", legend = rownames(modelxx1$beta),
-  col = colours,  
-  lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
-)
-
-
-#' Setting seed for reproducibility and doing cross-validation.
-set.seed(123)
-cv.lasso <- cv.glmnet(x, y, nfolds = 5)
-
-#' Plotting MSE vs log lambda
-plot(cv.lasso)
-
-
-#' Optimal lambda value that minimizes MSE
-optimal_lambda <- cv.lasso$lambda.min
-# MSE corresponding to optimal lambda
-optimal_mse <- cv.lasso$cvm[cv.lasso$lambda == optimal_lambda]
-
-#' Coefficients at optimal lambda
-optimal_coefs <- coef(cv.lasso, s = "lambda.min")
-print(optimal_coefs)
-
-
-
-
-################### Model 2: Continuous outcome.
-#' Identical process to the one used above, just 
-#' different family.
-
-# Define predictors and outcome with updated variable names
-predictors22 <- c(
-  "Type", "Gender", "Height", "Weight", "Age", "BMI", "COPD",
-  "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
-  "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
-  "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
-  "Preoperative_ECLS", "LAS_score", "Pre_Hb", "Pre_Hct",
-  "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_PTT", "Pre_Creatinine"
-)
-
-# Subset data for the new model
-model22data <- data[, c(predictors22, "Total_24hr_RBC")]
-
-# Create design matrix for predictors and outcome with updated variable names
-x22 <- model.matrix(Total_24hr_RBC ~ ., data = model22data)[, -1]
-y22 <- model22data$Total_24hr_RBC
-
-# Train Lasso model
-lasso_model22 <- glmnet(x22, y22, family = "gaussian")
-
-# Plot coefficients vs log(lambda)
-#plot(lasso_model22, xvar = "lambda", label = TRUE)
-
-# Plot Lasso plot
-plot(
-  lasso_model22, xvar = "lambda", label = TRUE, col = colours, 
-  lwd = 1,
-  main = "Lasso Paths",
-  xlab = "log(Lambda)", ylab = "Coefficients"
-)
-
-# Create a custom legend
-legend(
-  "bottomright", legend = rownames(lasso_model22$beta),
-  col = colours,  
-  lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
-)
-
-
-
-# Cross-validation to find optimal lambda
-set.seed(123)
-cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian", nfolds = 5)
-
-# Plot cross-validation curve
-plot(cv_lasso22)
-
-# Extract optimal lambda
-optimal_lambda22 <- cv_lasso22$lambda.min
-print(paste("Optimal Lambda:", optimal_lambda22))
-
-# Coefficients at optimal lambda
-optimal_coefs22 <- coef(cv_lasso22, s = "lambda.min")
-print(optimal_coefs22)
-
-
-
-
-
-
-
-
-
-
-
+#' Question 1
 ######NEW#######
 
 library(pROC)
 library(tree)
 
+#Need for transfusion 
+
 #TRANSFUSION
+
+#Assess and compares the performance of the methods (lasso classification vs. CART) using a fraction 
+#of the original data that was not used for training/tuning.
+#The best model (highest AUC score) will be used for further analysis.
 
 #LASSO CLASSIFICATION 
 
@@ -567,8 +431,6 @@ lasso_classi_auc_table <- data.frame(Iteration = 1:5, AUC = lasso_classi_auc)
 #Calculate the average AUC
 lasso_classi_auc_average <- round(mean(lasso_classi_auc), digits = 3)
 
-
-
 ###CART (full and pruned)
 
 model1data$Transfusion <- as.factor(model1data$Transfusion)
@@ -668,10 +530,57 @@ prune_auc_table <- data.frame(Iteration = 1:5, AUC = prune_classi_auc)
 #Calculate the average AUC - prune tree 
 prune_auc_average <- round(mean(prune_classi_auc), digits = 3)
 
+#The lasso model had a higher average AUC - proceeding with lasso classifiation
+#for further analysis
+
+################# LASSO CLASSIFICATION
+
+#Let's fit a lasso classification model with all of the data.
+
+#Using the same predictors and subset data as above, we will
+#make the matrix for the predictors, with dummy variables.
+x <- model.matrix(Transfusion ~ ., data = model1data)
+
+y <- as.numeric(model1data$Transfusion) - 1
+
+#' Train the model
+modelxx1 <- glmnet(x, y, family = "binomial")
+
+# Plot the Lasso paths 
+plot(
+  modelxx1, xvar = "lambda", label = TRUE, col = colours, 
+  lwd = 1,
+  main = "Lasso Paths",
+  xlab = "log(Lambda)", ylab = "Coefficients"
+)
+
+# Create a legend
+legend(
+  "topright", legend = rownames(modelxx1$beta),
+  col = colours,  
+  lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
+)
+
+#' Setting seed for reproducibility and doing cross-validation.
+set.seed(123)
+cv.lasso <- cv.glmnet(x, y, nfolds = 5, alpha = 1,family = "binomial", type.measure = "auc")
+
+#' Plotting MSE vs log lambda
+plot(cv.lasso)
+
+#' Optimal lambda value that maximizes AUC 
+optimal_lambda <- cv.lasso$lambda.min
+# AUC corresponding to optimal lambda
+optimal_auc <- cv.lasso$cvm[cv.lasso$lambda == optimal_lambda]
+
+#' Coefficients at optimal lambda
+optimal_coefs <- coef(cv.lasso, s = "lambda.min")
+print(optimal_coefs)
 
 
-
-
+################### Model 2: Continuous outcome.
+#' Identical process to the one used above, just  
+#' different family.
 
 #TOTAL RBC
 set.seed(123)
@@ -694,135 +603,43 @@ predictors22 <- c(
 # Subset data for the new model
 model22data <- data[, c(predictors22, "Total_24hr_RBC")]
 
-#Create an empty list to store the final predictors
-lasso_regres_predictor <- list()
+# Create design matrix for predictors and outcome with updated variable names
+x22 <- model.matrix(Total_24hr_RBC ~ ., data = model22data)[, -1]
+y22 <- model22data$Total_24hr_RBC
 
-#Create an empty vector to store the final AUC output
-lasso_regres_mse <- c()
+# Train Lasso model
+lasso_model22 <- glmnet(x22, y22, family = "gaussian")
 
-#LASSO CLASSIFER
+# Plot coefficients vs log(lambda)
+plot(
+  lasso_model22, xvar = "lambda", label = TRUE, col = colours, 
+  lwd = 1,
+  main = "Lasso Paths",
+  xlab = "log(Lambda)", ylab = "Coefficients"
+)
 
-#For loop to look at the average AUC for the Lasso classifer
-for (i in 1:5) {
-  #The training and testing set will be a standard 80/20 training/testing split
-  #80% of the data will be for training and 20% will be for testing
-  #Create a vector of row indices that corresponds to the trianing set
-  #The for loop will create 5 unique training sets
-  training <- sample(nrow(model22data), round(nrow(model22data) * 0.8))
-  
-  #Create a dummy variable for categorical variables and keeping the continuous variables the same 
-  x_regression <- model.matrix(Total_24hr_RBC ~., model22data)[training, -1]
-  
-  #Create a vector with the response values
-  y_regression <- model22data$Total_24hr_RBC[training]
-  
-  #Train a model
-  lasso_regression <- glmnet(x_regression, y_regression, family = "gaussian")
-  
-  # Plot Lasso plot
-  plot(
-    lasso_regression, xvar = "lambda", label = TRUE, col = colours, 
-    lwd = 1,
-    main = "Lasso Paths",
-    xlab = "log(Lambda)", ylab = "Coefficients"
-  )
-  
-  # Create a legend
-  legend(
-    "bottomright", legend = rownames(lasso_regression$beta),
-    col = colours,  
-    lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
-  )
-  
-  #Perform cross-validation to select the lambda that maximizes AUC 
-  cv_lasso_regression <- cv.glmnet(x_regression, y_regression, family = "gaussian", nfolds = 5)
-  
-  #Plot the curve
-  plot(cv_lasso_regression)
-  title(paste("Cross-Validation Plot for Lasso Classifier of", i))
-  
-  #Optimal lambda that maximizes the AUC
-  optimal_lambda_regression <- cv_lasso_regression$lambda.min
-  
-  #Train a model using the optimal lambda
-  lasso_model_regression_final <- glmnet(x_regression, y_regression, family = "gaussian", lambda = optimal_lambda)
-  
-  #Look at the value of the features that stay in the model when using the optimal lambda
-  coef_min_regression <- coef(cv_lasso_regression, s = "lambda.min")
-  
-  #List the selected predictors that stayed in the model
-  lasso_regres_predictor[[i]] <- rownames(coef_min_regression)[coef_min_regression[, 1] != 0][-1]
-  
-  #Test the model on the testing data set and get the predicted probability 
-  lasso_regres_predict <- as.numeric(predict(lasso_model_regression_final, newx = model.matrix(Total_24hr_RBC ~., model22data)[-training,-1], 
-                                            s = optimal_lambda, type = "response"))
- 
-  # Calculate Mean Squared Error (MSE)
-  MSE <- mean((model22data$Total_24hr_RBC[-training] - lasso_regres_predict)^2)
-  
-  lasso_regres_mse[i] <- MSE
-  
-}
+# Create a legend
+legend(
+  "bottomright", legend = rownames(lasso_model22$beta),
+  col = colours,  
+  lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
+)
 
-#Convert the predictors list to a data frame for better visualization (table)
-lasso_regres_predictors_table <- data.frame(Iteration = 1:5, Predictors = sapply(lasso_regres_predictor, toString))
-#View(lasso_class_predictors_table)
+# Cross-validation to find optimal lambda
+set.seed(123)
+cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian", nfolds = 5)
 
-#Convert MSE values to a data frame
-lasso_regres_mse_table <- data.frame(Iteration = 1:5, MSE = lasso_regres_mse)
-#View(lasso_regres_mse_table)
+# Plot cross-validation curve
+plot(cv_lasso22)
 
-#Calculate the average MSE
-lasso_regres_mse_average <- round(mean(lasso_regres_mse), digits = 3)
+# Extract optimal lambda
+optimal_lambda22 <- cv_lasso22$lambda.min
+print(paste("Optimal Lambda:", optimal_lambda22))
 
+# Coefficients at optimal lambda
+optimal_coefs22 <- coef(cv_lasso22, s = "lambda.min")
+print(optimal_coefs22)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Load pROC package if not already loaded
-
-# Create ROC curve and calculate AUC
-roc_lasso <- roc(y_test, as.numeric(pred_probs_lasso))
-auc_lasso <- auc(roc_lasso)
-
-# Plot ROC curve
-plot(roc_lasso, main = paste("Lasso Regression ROC Curve (AUC =", round(auc_lasso, 2), ")"))
-
-
-
-
-
-################## TREE STUFF
-data$Transfusion <- as.factor(data$Transfusion)
-
-# Construct the formula
-tree_formula <- as.formula(paste("Transfusion ~", paste(x, collapse = " + ")))
-
-
-# Build the classification tree model
-tree_model <- tree(tree_formula, data = data)
-
-# Plot the tree
-plot(tree_model)
-text(tree_model, pretty = 0)
-
-###
-### Combine Transfusion and Massive Transfusion into one variable with 3 levels. 
-### Make one Lasso.
-###
 
 ###
 ### Be ready to answer the question: 
