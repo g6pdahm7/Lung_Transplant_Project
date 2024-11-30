@@ -12,6 +12,8 @@ library(funModeling)
 library(corrplot)
 library(mice)
 library(glmnet)
+library(pastecs)
+library(tidyverse)
 
 #' Columns that were not highlighted were removed a priori
 #' on Excel. Since we are using Git, the same file should 
@@ -78,6 +80,9 @@ data$Gender <- ifelse(data$Gender == "TRUE", "Male", "Female")
 #' Some initial thoughts: 
 #' Pre_Fibrinogen will have to be excluded due to 
 #' missingness greater than 30%.
+#' 
+####################
+### Cleaning/EDA ###
 
 #' Next, we will perform a simple EDA prior to 
 #' handling the any missingness.
@@ -86,6 +91,74 @@ data$Gender <- ifelse(data$Gender == "TRUE", "Male", "Female")
 #' that states whether or not someone had a transplant.
 data <- data %>%
   mutate(Transfusion = ifelse(Total_24hr_RBC > 0, TRUE, FALSE))
+
+#' Summary table of numeric variables
+desc.data <- stat.desc(dplyr::select_if(data, is.numeric))
+
+desc.data <- desc.data[-c(1,2,3,7,10,11),-c(1)] #remove rows and cols with irrelevant descriptive stats
+
+# Split the data into smaller parts (e.g., 10 columns each)
+desc.1 <- desc.data[,c(1:13)]
+desc.2 <- desc.data[,c(14:26)]
+desc.3 <- desc.data[,c(27:37)]
+
+# Render each subset as a separate table for better formatting
+kable(desc.1, format = "html", digits = 2, 
+      caption = "Descriptive Statistics for Numeric Data in Lung Transplant Patients Dataset") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+kable(desc.2, format = "html", digits = 2, 
+      caption = "Descriptive Statistics for Numeric Data in Lung Transplant Patients Dataset") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+kable(desc.3, format = "html", digits = 2, 
+      caption = "Descriptive Statistics for Numeric Data in Lung Transplant Patients Dataset") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+#' Summary table of count data
+#subset non-numerical variables
+character.data <- data %>% select_if(negate(is.numeric))
+character.data <- character.data[,-c(1,17)] #remove OR date, death date
+
+character.data <- character.data %>%
+  mutate(across(everything(), as.character)) #ensure all cols are characters
+
+# Function to summarize non-numerical variables
+summarize_character_data_combined <- function(df) {
+  # Summarize each column
+  summary_list <- lapply(names(df), function(var) {
+    df %>%
+      count(!!sym(var), name = "Count") %>%
+      mutate(
+        Variable = var,
+        Proportion = round((Count / sum(Count)) * 100, 2)
+      ) %>%
+      rename(Category = !!sym(var)) %>%
+      select(Variable, Category, Count, Proportion)
+  })
+  
+  # Combine all summaries into one dataframe
+  summary_df <- bind_rows(summary_list)
+  
+  # Combine Variable and Category into a single column
+  summary_df <- summary_df %>%
+    mutate(Combined = paste(Variable, Category, sep = " - ")) %>%
+    select(Combined, Count, Proportion)
+  
+  return(summary_df)
+}
+
+summary_table <- summarize_character_data_combined(character.data)
+
+#table of non-numerical data
+kable(summary_table, format = "html", caption = "Summary of Non-Numeric Variables", 
+      col.names = c("Variable", "Count","Proportion (%)")) %>%
+      kable_styling(bootstrap_options = "condensed") %>%
+      row_spec(c(1:3, 6:7, 10:11, 14:15, 18:19, 22:23, 26:27, 32:37), background = "#f2f2f2") 
+
 
 #' Bar plot for the number of people with and without transfusions
 ggplot(data, aes(x = as.factor(Transfusion))) +
@@ -129,7 +202,89 @@ ggplot(data, aes(x = ALIVE_30DAYS_YN, y = Total_24hr_RBC)) +
   labs(title = "Total RBC Transfusion by 30-Day Survival", x = "Survived 30 Days (Y/N)", y = "Total RBC Units") + 
   theme_minimal()
 
-#' Next, I want to create a simple correlation plot of some of 
+#histogram length of hospital stay 
+ggplot(data, aes(x = HOSPITAL_LOS)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of Hospital Stay Length", x = "Hospital Stay (days)", y = "Frequency") + 
+  theme_minimal()
+
+#histogram of icu stay length
+ggplot(data, aes(x = ICU_LOS)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of ICU Stay Length", x = "ICU Stay (days)", y = "Frequency") + 
+  theme_minimal()
+
+######################################################
+### Exploring Transfusions/Massive Transfusion Pts ###
+
+#subset data for transfusion and massive transfusion
+data.transfusion <- data %>%
+  filter(Transfusion == "TRUE") 
+data.transfusion$Transfusion <- as.factor(data.transfusion$Transfusion)
+
+data.massive <- data %>%
+  filter(Massive_Transfusion == 1)
+data.massive$Massive_Transfusion <- as.factor(data.massive$Massive_Transfusion)
+data.massive$Transfusion <- as.factor(data.massive$Transfusion)
+
+#### Descriptive Characteristics of people with transfusions
+char.transfusion <- data.transfusion %>% select_if(negate(is.numeric))
+char.transfusion <- char.transfusion[,-c(1,17,21)] #remove OR date, death date
+
+char.transfusion <- char.transfusion %>%
+  mutate(across(everything(), as.character)) #ensure all cols are characters
+
+#summarize columns
+summarize_transfusion_data_combined <- function(df) {
+  # Summarize each column
+  summary_list <- lapply(names(df), function(var) {
+    df %>%
+      count(!!sym(var), name = "Count") %>%
+      mutate(
+        Variable = var,
+        Proportion = round((Count / sum(Count)) * 100, 2)
+      ) %>%
+      rename(Category = !!sym(var)) %>%
+      select(Variable, Category, Count, Proportion)
+  })
+  
+  # Combine all summaries into one dataframe
+  summary_df <- bind_rows(summary_list)
+  
+  # Combine Variable and Category into a single column
+  summary_df <- summary_df %>%
+    mutate(Combined = paste(Variable, Category, sep = " - ")) %>%
+    select(Combined, Count, Proportion)
+  
+  return(summary_df)
+}
+
+transfusion_summary_table <- summarize_transfusion_data_combined(char.transfusion)
+
+#Table of transfusion pt characterisitcs
+kable(transfusion_summary_table, format = "html", caption = "Characterisitcs of Patients with Transfusions (Non-Numeric Variables)", 
+      col.names = c("Variable", "Count","Proportion (%)")) %>%
+  kable_styling(bootstrap_options = "condensed") %>%
+  row_spec(c(1:3, 6:7, 10:11, 14:15, 18:19, 22:23, 26:27, 32:37), background = "#f2f2f2") #highlight to group variables
+
+
+
+
+#there may be a differences in hospital & icu LOS, and LAS scores for transfusion and massive transfusion 
+# vs no tranfusion; lets explore this 
+
+#################################################################
+### Exploring differences in pt. characteristics of transfusion #
+#        & massive transfusion vs no transfusion
+
+
+
+
+
+##################
+## Correlations ## MAUSAM CHECK!!!!!!!!!!!!!!!
+
+#' Create a simple correlation plot of some of 
 #' the patient characteristics, and some of the general outcomes:
 
 #' Create a new data set to view correction
@@ -143,7 +298,6 @@ correlation_data$ALIVE_30DAYS_YN <- as.numeric(data$ALIVE_30DAYS_YN == "Y")
 correlation_data$ALIVE_90DAYS_YN <- as.numeric(data$ALIVE_90DAYS_YN == "Y")  
 correlation_data$ALIVE_12MTHS_YN <- as.numeric(data$ALIVE_12MTHS_YN == "Y") 
 
-
 #' Define groups of variables
 group1 <- correlation_data %>%
   select(Age, Gender, Weight, Height, BMI, Type)
@@ -151,6 +305,7 @@ group1 <- correlation_data %>%
 group2 <- correlation_data %>%
   select(Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN)
 
+## CHECK THISSSSSSS ALL THE CORRELATION STUFF
 #' Compute correlation matrix between group1 and group2
 cor_matrix <- cor(group1, group2, use = "pairwise.complete.obs")
 
@@ -160,6 +315,8 @@ corrplot(cor_matrix, method = "color", is.corr = TRUE,
          title = "Correlation Plot Between Predictors and Outcomes",
          mar = c(0, 0, 1, 0))
 
+#######################################
+#' Additional cleaning and Imputation #
 
 #' We will now create histograms for the two columns we will impute.
 #' This will help inform the imputation method we will use.
@@ -177,14 +334,6 @@ ggplot(data, aes(x = Pre_PTT)) +
   labs(title = "Distribution of Pre PTT", x = "Pre PTT", y = "Frequency") +
   theme_minimal()
 #' Right skewed
-
-
-###
-### Tailor EDA to answer first part of first question
-### Characteristics of patients that require transfusions.
-###
-
-#' Additional cleaning and Imputation
 
 #' We will start by removing an unnecessary column that is 
 #' redundant with another column for icu stay.
@@ -239,9 +388,7 @@ data <- data %>% select(-ECLS_CPB)
 data <- data %>% mutate_if(is.character, as.factor)
 colnames(data) <- gsub("[#-]", "_", colnames(data))
 
-#' Imputation
-
-
+#' Imputation ##
 #' Converting character variables to factors
 data <- data %>% mutate_if(is.character, as.factor)
 
@@ -298,12 +445,7 @@ xyplot(imputed111, Pre_PTT ~ Pre_Hct)
 
 
 
-
-
-
-#' Analysis 
-
-
+# Analysis ---------------------------------------------------------------------
 
 ################# LASSO CLASSIFICATION
 
