@@ -674,8 +674,106 @@ prune_auc_average <- round(mean(prune_classi_auc), digits = 3)
 
 
 #TOTAL RBC
+set.seed(123)
 
 #LASSO REGRESSION
+
+#' Identical process to the one used above, just 
+#' different family.
+
+# Define predictors and outcome with updated variable names
+predictors22 <- c(
+  "Type", "Gender", "Height", "Weight", "Age", "BMI", "COPD",
+  "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
+  "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
+  "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
+  "Preoperative_ECLS", "LAS_score", "Pre_Hb", "Pre_Hct",
+  "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_PTT", "Pre_Creatinine"
+)
+
+# Subset data for the new model
+model22data <- data[, c(predictors22, "Total_24hr_RBC")]
+
+#Create an empty list to store the final predictors
+lasso_regres_predictor <- list()
+
+#Create an empty vector to store the final AUC output
+lasso_regres_mse <- c()
+
+#LASSO CLASSIFER
+
+#For loop to look at the average AUC for the Lasso classifer
+for (i in 1:5) {
+  #The training and testing set will be a standard 80/20 training/testing split
+  #80% of the data will be for training and 20% will be for testing
+  #Create a vector of row indices that corresponds to the trianing set
+  #The for loop will create 5 unique training sets
+  training <- sample(nrow(model22data), round(nrow(model22data) * 0.8))
+  
+  #Create a dummy variable for categorical variables and keeping the continuous variables the same 
+  x_regression <- model.matrix(Total_24hr_RBC ~., model22data)[training, -1]
+  
+  #Create a vector with the response values
+  y_regression <- model22data$Total_24hr_RBC[training]
+  
+  #Train a model
+  lasso_regression <- glmnet(x_regression, y_regression, family = "gaussian")
+  
+  # Plot Lasso plot
+  plot(
+    lasso_regression, xvar = "lambda", label = TRUE, col = colours, 
+    lwd = 1,
+    main = "Lasso Paths",
+    xlab = "log(Lambda)", ylab = "Coefficients"
+  )
+  
+  # Create a legend
+  legend(
+    "bottomright", legend = rownames(lasso_regression$beta),
+    col = colours,  
+    lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
+  )
+  
+  #Perform cross-validation to select the lambda that maximizes AUC 
+  cv_lasso_regression <- cv.glmnet(x_regression, y_regression, family = "gaussian", nfolds = 5)
+  
+  #Plot the curve
+  plot(cv_lasso_regression)
+  title(paste("Cross-Validation Plot for Lasso Classifier of", i))
+  
+  #Optimal lambda that maximizes the AUC
+  optimal_lambda_regression <- cv_lasso_regression$lambda.min
+  
+  #Train a model using the optimal lambda
+  lasso_model_regression_final <- glmnet(x_regression, y_regression, family = "gaussian", lambda = optimal_lambda)
+  
+  #Look at the value of the features that stay in the model when using the optimal lambda
+  coef_min_regression <- coef(cv_lasso_regression, s = "lambda.min")
+  
+  #List the selected predictors that stayed in the model
+  lasso_regres_predictor[[i]] <- rownames(coef_min_regression)[coef_min_regression[, 1] != 0][-1]
+  
+  #Test the model on the testing data set and get the predicted probability 
+  lasso_regres_predict <- as.numeric(predict(lasso_model_regression_final, newx = model.matrix(Total_24hr_RBC ~., model22data)[-training,-1], 
+                                            s = optimal_lambda, type = "response"))
+ 
+  # Calculate Mean Squared Error (MSE)
+  MSE <- mean((model22data$Total_24hr_RBC[-training] - lasso_regres_predict)^2)
+  
+  lasso_regres_mse[i] <- MSE
+  
+}
+
+#Convert the predictors list to a data frame for better visualization (table)
+lasso_regres_predictors_table <- data.frame(Iteration = 1:5, Predictors = sapply(lasso_regres_predictor, toString))
+#View(lasso_class_predictors_table)
+
+#Convert MSE values to a data frame
+lasso_regres_mse_table <- data.frame(Iteration = 1:5, MSE = lasso_regres_mse)
+#View(lasso_regres_mse_table)
+
+#Calculate the average MSE
+lasso_regres_mse_average <- round(mean(lasso_regres_mse), digits = 3)
 
 
 
