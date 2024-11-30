@@ -448,6 +448,7 @@ print(optimal_coefs22)
 ######NEW#######
 
 library(pROC)
+library(tree)
 
 #TRANSFUSION
 
@@ -568,15 +569,113 @@ lasso_classi_auc_average <- round(mean(lasso_classi_auc), digits = 3)
 
 
 
+###CART (full and pruned)
+
+model1data$Transfusion <- as.factor(model1data$Transfusion)
+
+#Create an empty list to store the variables from the CART model - full tree
+tree_classi_predictors <- list()
+
+#Create an empty vector to store the AUC output - full tree 
+tree_classi_auc <- c()
+
+#Create an empty list to store the variables from the CART model - full tree
+prune_classi_predictors <- list()
+
+#Create an empty vector to store the AUC output - full tree 
+prune_classi_auc <- c()
+
+#For loop to look at the CART model for each iteration of the data
+for (i in 1:5) {
+  
+  #The training and testing set will be a standard 80/20 training/testing split
+  #80% of the data will be for training and 20% will be for testing
+  #Create a vector of row indices that corresponds to the training set
+  #The for loop will create 5 unique training sets
+  training <- sample(nrow(model1data), round(nrow(model1data) * 0.8))
+  
+  #Training CART
+  tree_model <- tree(Transfusion ~ ., data = model1data, subset = training)
+  plot(tree_model)
+  title(paste("Full Tree Model of", i))
+  text(tree_model, pretty=0)
+  
+  #Perform cross-validation to prune the tree using deviance 
+  cv_tree <- cv.tree(tree_model, FUN = prune.tree, method = "deviance")
+  
+  #Find the best size of the tree for pruning associated with the lowest deviance 
+  best_size <- cv_tree$size[which.min(cv_tree$dev)]
+  
+  #Prune the tree to the best size
+  #Best size is set to 2 to avoid a "stump"
+  pruned_tree <- prune.tree(tree = tree_model, best = 2)
+  
+  #Plot the tree
+  plot(pruned_tree)
+  title(paste("Pruned Tree Model of", i))
+  text(pruned_tree, pretty=0)
+  
+  #Extract the variables that were used in the final model
+  variable_prune <- unique(pruned_tree$frame$var[pruned_tree$frame$var != "<leaf>"])
+  prune_classi_predictors[[i]] <- variable_prune
+  
+  #Predict using the pruned tree model
+  tree_prune_predict <- predict(pruned_tree, newdata = model1data[-training,], type = "vector")
+  
+  #Extract the predicted probability 
+  pred_probs_prune_tree <- as.numeric(tree_prune_predict[,2])
+  
+  #Generate the ROC curve for testing 
+  roc_prune <-  roc(model1data$Transfusion[-training] ~ pred_probs_prune_tree)
+  plot(roc_prune)
+  title(paste("AUC-ROC Curve (Prune) of", i))
+  prune_classi_auc[i] <- roc_prune$auc
+  
+  #Let's do the same evaluation fro the original tree without pruning 
+  #Extract the variables that were used in the tree model without pruning
+  variable_tree <- unique(tree_model$frame$var[tree_model$frame$var != "<leaf>"])
+  tree_classi_predictors[[i]] <- variable_tree
+  
+  #Predict using the full tree model
+  tree_predict <- predict(tree_model, newdata = model1data[-training,], type = "vector")
+  
+  #Extract the predicted probability 
+  pred_probs_tree <- as.numeric(tree_predict[,2])
+  
+  #Generate the ROC curve for testing 
+  roc_tree <-  roc(model1data$Transfusion[-training] ~ pred_probs_tree)
+  plot(roc_tree)
+  title(paste("AUC-ROC Curve (Full) of", i))
+  tree_classi_auc[i] <- roc_tree$auc
+  
+}
+
+#Convert the predictors list to a data frame for better visualization (table) - full tree
+tree_classi_predictors_table <- data.frame(Iteration = 1:5, Variables = sapply(tree_classi_predictors, toString))
+
+#Convert the AUC values to a data frame (table) - full tree
+tree_auc_table <- data.frame(Iteration = 1:5, AUC = tree_classi_auc)
+
+#Calculate the average AUC - full tree 
+tree_auc_average <- round(mean(tree_classi_auc), digits = 3)
+
+#Convert the predictors list to a data frame for better visualization (table) - prune tree
+prune_predictors_table <- data.frame(Iteration = 1:5, Variables = sapply(prune_classi_predictors, toString))
+
+#Convert the AUC values to a data frame (table) - prune tree
+prune_auc_table <- data.frame(Iteration = 1:5, AUC = prune_classi_auc)
+
+#Calculate the average AUC - prune tree 
+prune_auc_average <- round(mean(prune_classi_auc), digits = 3)
 
 
 
 
 
 
+#TOTAL RBC
 
-
-
+#LASSO REGRESSION
 
 
 
