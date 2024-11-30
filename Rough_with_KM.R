@@ -348,7 +348,7 @@ plot(
   xlab = "log(Lambda)", ylab = "Coefficients"
 )
 
-# Create a custom legend
+# Create a legend
 legend(
   "topright", legend = rownames(modelxx1$beta),
   col = colours,  
@@ -437,11 +437,28 @@ print(optimal_coefs22)
 
 
 
-################# Model 3: Lasso Classification with Massive Transfusions
+
+
+
+
+
+
+
+
+######NEW#######
+
+library(pROC)
+
+#TRANSFUSION
+
+#LASSO CLASSIFICATION 
+
+#Set the seed
+set.seed(111)
 
 #' Next we are going to identify the predictors that 
 #' we will be using in the Lasso classification model. 
-predictors33 <- c(
+x <- c(
   "Type", "Gender", "Height", "Weight", "Age", "BMI", "COPD",
   "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
   "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
@@ -451,52 +468,159 @@ predictors33 <- c(
 )
 
 #' Subsetting the model data
-model3data <- data[, c(predictors33, "Massive_Transfusion")]
+model1data <- data[, c(x, "Transfusion")]
 
-#' Next we need to make the matrix for the predictors, 
-#' with dummy variables.
-x33 <- model.matrix(Massive_Transfusion ~ ., data = model3data)
+#Create an empty list to store the final predictors
+lasso_classi_predictor <- list()
 
-y33 <- as.numeric(model3data$Massive_Transfusion) - 1
+#Create an empty vector to store the final AUC output
+lasso_classi_auc <- c()
 
-#' Train the model
-
-modelxx3 <- glmnet(x33, y33, family = "binomial")
-
-#plot(modelxx3,label = T, xvar = "lambda")
-
-# Plot the Lasso paths 
-plot(
-  modelxx3, xvar = "lambda", label = TRUE, col = colours, 
-  lwd = 1,
-  main = "Lasso Paths",
-  xlab = "log(Lambda)", ylab = "Coefficients"
+# Define 27 custom hex colors for plotting
+colours <- c(
+  "#195d90", "#297022", "#b91c16", "#cc6600", "#52267d", "#8c4a20", "#7ca6c2",
+  "#8eb072", "#c47272", "#cc9933", "#9b94ac", "#cccc66", "#6da395", "#cccc80",
+  "#958094", "#cc665b", "#6686a4", "#cc8a4e", "#8aa24f", "#cc9ab5", "#a1a1a1",
+  "#9c66a1", "#a2cca0", "#ccba59", "#52907e", "#cc7250", "#6e80a4"
 )
 
-# Create a custom legend
-legend(
-  "bottomright", legend = rownames(modelxx3$beta),
-  col = colours,  
-  lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
-)
+#LASSO CLASSIFER
+
+#For loop to look at the average AUC for the Lasso classifer
+for (i in 1:5) {
+  
+  #The training and testing set will be a standard 80/20 training/testing split
+  #80% of the data will be for training and 20% will be for testing
+  #Create a vector of row indices that corresponds to the trianing set
+  #The for loop will create 5 unique training sets
+  training <- sample(nrow(model1data), round(nrow(model1data) * 0.8))
+  
+  #Create a dummy variable for categorical variables and keeping the continuous variables the same 
+  x_classification <- model.matrix(Transfusion ~., model1data)[training, -1]
+  
+  #Create a vector with the response values
+  y_classification <- model1data$Transfusion[training]
+
+    #Train a model
+  lasso_model_classification <- glmnet(x_classification, y_classification, family = "binomial")
+  
+  # Plot Lasso plot
+  plot(
+    lasso_model_classification, xvar = "lambda", label = TRUE, col = colours, 
+    lwd = 1,
+    main = paste("Log(lambda) vs. Coefficients for Lasso Iteration of", i),
+    xlab = "log(Lambda)", ylab = "Coefficients"
+  )
+  
+  
+  # Create a legend
+  legend(
+    "topright", legend = rownames(modelxx1$beta),
+    col = colours,  
+    lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
+  )
+  
+  #Perform cross-validation to select the lambda that maximizes AUC 
+  cv_classification <- cv.glmnet(x_classification, y_classification, family = "binomial", type.measure = "auc")
+  
+  #Plot the curve
+  plot(cv_classification)
+  title(paste("Cross-Validation Plot for Lasso Classifier of", i))
+  
+  #Optimal lambda that maximizes the AUC
+  optimal_lambda <- cv_classification$lambda.min
+  
+  #Train a model using the optimal lambda
+  lasso_model_classification_final <- glmnet(x_classification, y_classification, family = "binomial", lambda = optimal_lambda)
+  
+  #Look at the value of the features that stay in the model when using the optimal lambda
+  coef_min_classification <- coef(cv_classification, s = "lambda.min")
+  
+  #List the selected predictors that stayed in the model
+  lasso_classi_predictor[[i]] <- rownames(coef_min_classification)[coef_min_classification[, 1] != 0][-1]
+  
+  #Test the model on the testing data set and get the predicted probability 
+  lasso_class_predict <- as.numeric(predict(lasso_model_classification_final, newx = model.matrix(Transfusion ~., model1data)[-training,-1], 
+                                            s = optimal_lambda, type = "response"))
+  
+  #Generate the ROC curve for the testing data set 
+  roc_class <- roc(model1data$Transfusion[-training], lasso_class_predict)
+  
+  #Plot ROC curve 
+  plot(roc_class)
+  title(paste("AUC-ROC curve (Lasso) of", i))
+  
+  #List the resulting AUC value from each loop's model
+  lasso_classi_auc[i] <- roc_class$auc
+  
+}
+
+#Convert the predictors list to a data frame for better visualization (table)
+lasso_class_predictors_table <- data.frame(Iteration = 1:5, Predictors = sapply(lasso_classi_predictor, toString))
+#View(lasso_class_predictors_table)
+
+#Convert the AUC values to a data frame (table)
+lasso_classi_auc_table <- data.frame(Iteration = 1:5, AUC = lasso_classi_auc)
+#View(lasso_classi_auc_table)
+
+#Calculate the average AUC
+lasso_classi_auc_average <- round(mean(lasso_classi_auc), digits = 3)
 
 
-#' Setting seed for reproducibility and doing cross-validation.
-set.seed(123)
-cv_lasso_mt <- cv.glmnet(x33, y33, nfolds = 5)
-
-#' Plotting MSE vs log lambda
-plot(cv_lasso_mt)
 
 
-#' Optimal lambda value that minimizes MSE
-optimal_lambda_mt <- cv_lasso_mt$lambda.min
-# MSE corresponding to optimal lambda
-optimal_mse_mt <- cv_lasso_mt$cvm[cv_lasso_mt$lambda == optimal_lambda]
 
-#' Coefficients at optimal lambda
-optimal_coefs_mt <- coef(cv_lasso_mt, s = "lambda.min")
-print(optimal_coefs_mt)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Load pROC package if not already loaded
+
+# Create ROC curve and calculate AUC
+roc_lasso <- roc(y_test, as.numeric(pred_probs_lasso))
+auc_lasso <- auc(roc_lasso)
+
+# Plot ROC curve
+plot(roc_lasso, main = paste("Lasso Regression ROC Curve (AUC =", round(auc_lasso, 2), ")"))
+
+
+
+
+
+################## TREE STUFF
+data$Transfusion <- as.factor(data$Transfusion)
+
+# Construct the formula
+tree_formula <- as.formula(paste("Transfusion ~", paste(x, collapse = " + ")))
+
+
+# Build the classification tree model
+tree_model <- tree(tree_formula, data = data)
+
+# Plot the tree
+plot(tree_model)
+text(tree_model, pretty = 0)
 
 ###
 ### Combine Transfusion and Massive Transfusion into one variable with 3 levels. 
