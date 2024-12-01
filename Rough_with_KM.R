@@ -422,17 +422,28 @@ for (i in 1:5) {
 #Convert the predictors list to a data frame for better visualization (table)
 lasso_class_predictors_table <- data.frame(Iteration = 1:5, Predictors = sapply(lasso_classi_predictor, toString))
 kable(
-  lasso_class_predictors_table,
+  lasso_class_predictors_table, format = "html", digits = 2, 
   col.names = c("Iteration", "Predictors"),
   caption = "Lasso Classifiers - Selected Predictors for Each Iteration"
-)
+) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
 
 #Convert the AUC values to a data frame (table)
 lasso_classi_auc_table <- data.frame(Iteration = 1:5, AUC = lasso_classi_auc)
-#View(lasso_classi_auc_table)
+
+kable(
+  lasso_classi_auc_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "AUC"),
+  caption = "Lasso Classifiers - AUC for Each Iteration"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE, position = "center")
 
 #Calculate the average AUC
 lasso_classi_auc_average <- round(mean(lasso_classi_auc), digits = 3)
+
 
 ###CART (full and pruned)
 
@@ -518,8 +529,26 @@ for (i in 1:5) {
 #Convert the predictors list to a data frame for better visualization (table) - full tree
 tree_classi_predictors_table <- data.frame(Iteration = 1:5, Variables = sapply(tree_classi_predictors, toString))
 
+kable(
+  tree_classi_predictors_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "Predictors"),
+  caption = "CART Tree - Selected Predictors for Each Iteration"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
 #Convert the AUC values to a data frame (table) - full tree
 tree_auc_table <- data.frame(Iteration = 1:5, AUC = tree_classi_auc)
+
+kable(
+  tree_auc_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "AUC"),
+  caption = "CART Tree - AUC for Each Iteration"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE, position = "center")
+
 
 #Calculate the average AUC - full tree 
 tree_auc_average <- round(mean(tree_classi_auc), digits = 3)
@@ -527,13 +556,51 @@ tree_auc_average <- round(mean(tree_classi_auc), digits = 3)
 #Convert the predictors list to a data frame for better visualization (table) - prune tree
 prune_predictors_table <- data.frame(Iteration = 1:5, Variables = sapply(prune_classi_predictors, toString))
 
+kable(
+  prune_predictors_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "Predictors"),
+  caption = "CART Pruned Tree - Selected Predictors for Each Iteration"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center")
+
 #Convert the AUC values to a data frame (table) - prune tree
 prune_auc_table <- data.frame(Iteration = 1:5, AUC = prune_classi_auc)
+
+kable(
+  prune_auc_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "AUC"),
+  caption = "CART Pruned Tree - AUC for Each Iteration"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE, position = "center")
 
 #Calculate the average AUC - prune tree 
 prune_auc_average <- round(mean(prune_classi_auc), digits = 3)
 
-#The lasso model had a higher average AUC - proceeding with lasso classifiation
+#Combine AUC values into a single data frame
+auc_comparison_table <- data.frame(
+  Model = c("LASSO Classification", "CART Tree", "CART Pruned Tree"),
+  Average_AUC = c(
+    lasso_classi_auc_average, 
+    round(mean(tree_classi_auc), digits = 3), 
+    prune_auc_average
+  )
+)
+
+kable(
+  auc_comparison_table, format = "html", digits = 3, 
+  col.names = c("Model", "Average AUC"),
+  caption = "Comparison of Average AUC Across Models"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  )
+
+#The lasso model had a higher average AUC - proceeding with lasso classification
 #for further analysis
 
 ################# LASSO CLASSIFICATION
@@ -578,8 +645,29 @@ optimal_auc <- cv.lasso$cvm[cv.lasso$lambda == optimal_lambda]
 
 #' Coefficients at optimal lambda
 optimal_coefs <- coef(cv.lasso, s = "lambda.min")
-print(optimal_coefs)
 
+#Extract non-zero coefficients and create a data frame
+optimal_coefs_table <- as.data.frame(as.matrix(optimal_coefs))
+optimal_coefs_table <- data.frame(
+  Predictor = rownames(optimal_coefs_table),
+  Coefficient = optimal_coefs_table[, 1]
+)
+#Remove row names
+rownames(optimal_coefs_table) <- NULL 
+
+# Filter to display only non-zero coefficients
+optimal_coefs_table <- optimal_coefs_table[optimal_coefs_table$Coefficient != 0, ]
+
+kable(
+  optimal_coefs_table, format = "html", digits = 4,
+  col.names = c("Predictor", "Coefficient"),
+  caption = "Optimal Coefficients from Lasso Model"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  )
 
 ################### Model 2: Continuous outcome.
 #' Identical process to the one used above, just  
@@ -641,8 +729,34 @@ print(paste("Optimal Lambda:", optimal_lambda22))
 
 # Coefficients at optimal lambda
 optimal_coefs22 <- coef(cv_lasso22, s = "lambda.min")
-print(optimal_coefs22)
 
+#Extract non-zero coefficients and create a data frame
+optimal_coefs22_table <- as.data.frame(as.matrix(optimal_coefs22))
+optimal_coefs22_table <- data.frame(
+  Predictor = rownames(optimal_coefs22_table),
+  Coefficient = optimal_coefs22_table[, 1]
+)
+
+# Remove row names
+rownames(optimal_coefs22_table) <- NULL  
+
+# Filter to display only non-zero coefficients
+optimal_coefs22_table <- optimal_coefs22_table[optimal_coefs22_table$Coefficient != 0, ]
+
+# Use kable to display the table
+library(knitr)
+library(kableExtra)
+
+kable(
+  optimal_coefs22_table, format = "html", digits = 4,
+  col.names = c("Predictor", "Coefficient"),
+  caption = "Optimal Coefficients from Second Lasso Model"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  )
 
 ###
 ### Be ready to answer the question: 
