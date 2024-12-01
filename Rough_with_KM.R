@@ -306,6 +306,7 @@ stripplot(imputed111, pch = c(21, 20), cex = c(1, 1.5))
 
 library(pROC)
 library(tree)
+library(knitr)
 
 #Need for transfusion 
 
@@ -420,7 +421,11 @@ for (i in 1:5) {
 
 #Convert the predictors list to a data frame for better visualization (table)
 lasso_class_predictors_table <- data.frame(Iteration = 1:5, Predictors = sapply(lasso_classi_predictor, toString))
-#View(lasso_class_predictors_table)
+kable(
+  lasso_class_predictors_table,
+  col.names = c("Iteration", "Predictors"),
+  caption = "Lasso Classifiers - Selected Predictors for Each Iteration"
+)
 
 #Convert the AUC values to a data frame (table)
 lasso_classi_auc_table <- data.frame(Iteration = 1:5, AUC = lasso_classi_auc)
@@ -625,7 +630,7 @@ legend(
 
 # Cross-validation to find optimal lambda
 set.seed(123)
-cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian", nfolds = 5)
+cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian")
 
 # Plot cross-validation curve
 plot(cv_lasso22)
