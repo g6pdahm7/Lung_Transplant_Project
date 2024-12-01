@@ -307,6 +307,7 @@ stripplot(imputed111, pch = c(21, 20), cex = c(1, 1.5))
 library(pROC)
 library(tree)
 library(knitr)
+library(kableExtra)
 
 #Need for transfusion 
 
