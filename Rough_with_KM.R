@@ -391,21 +391,21 @@ for (i in 1:5) {
   plot(cv_classification)
   title(paste("Cross-Validation Plot for Lasso Classifier of", i))
   
-  #Optimal lambda that maximizes the AUC
-  optimal_lambda <- cv_classification$lambda.min
+  #1SE lambda that maximizes the AUC
+  se_lambda <- cv_classification$lambda.1se
   
-  #Train a model using the optimal lambda
-  lasso_model_classification_final <- glmnet(x_classification, y_classification, family = "binomial", lambda = optimal_lambda)
+  #Train a model using the 1SE lambda
+  lasso_model_classification_final <- glmnet(x_classification, y_classification, family = "binomial", lambda = se_lambda)
   
-  #Look at the value of the features that stay in the model when using the optimal lambda
-  coef_min_classification <- coef(cv_classification, s = "lambda.min")
+  #Look at the value of the features that stay in the model when using the 1SE lambda
+  coef_min_classification <- coef(cv_classification, s = "lambda.1se")
   
   #List the selected predictors that stayed in the model
   lasso_classi_predictor[[i]] <- rownames(coef_min_classification)[coef_min_classification[, 1] != 0][-1]
   
   #Test the model on the testing data set and get the predicted probability 
   lasso_class_predict <- as.numeric(predict(lasso_model_classification_final, newx = model.matrix(Transfusion ~., model1data)[-training,-1], 
-                                            s = optimal_lambda, type = "response"))
+                                            s = se_lambda, type = "response"))
   
   #Generate the ROC curve for the testing data set 
   roc_class <- roc(model1data$Transfusion[-training], lasso_class_predict)
@@ -428,6 +428,18 @@ kable(
 ) %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), 
                 full_width = FALSE, position = "center") 
+
+# Check how common each predictors appears 
+
+# Flatten the list of predictors and count the frequency of each predictor
+predictor_list <- unlist(lasso_classi_predictor)
+predictor_freq <- table(predictor_list)
+
+# Sort the frequencies in descending order
+predictor_freq_sorted <- sort(predictor_freq, decreasing = TRUE)
+
+# View the sorted frequency table
+predictor_freq_sorted
 
 #Convert the AUC values to a data frame (table)
 lasso_classi_auc_table <- data.frame(Iteration = 1:5, AUC = lasso_classi_auc)
@@ -537,6 +549,20 @@ kable(
   kable_styling(bootstrap_options = c("striped", "condensed"), 
                 full_width = FALSE, position = "center") 
 
+# Check how common each predictors appears 
+
+# Convert the list of predictors from all iterations into a single vector
+all_tree_predictors <- unlist(tree_classi_predictors)
+
+# Count the frequency of each predictor
+predictor_counts <- table(all_tree_predictors)
+
+# Sort the predictors from most to least frequent
+sorted_predictor_counts <- sort(predictor_counts, decreasing = TRUE)
+
+# Display the sorted frequency of predictors
+sorted_predictor_counts
+
 #Convert the AUC values to a data frame (table) - full tree
 tree_auc_table <- data.frame(Iteration = 1:5, AUC = tree_classi_auc)
 
@@ -637,31 +663,33 @@ cv.lasso <- cv.glmnet(x, y, nfolds = 5, alpha = 1,family = "binomial", type.meas
 
 #' Plotting MSE vs log lambda
 plot(cv.lasso)
+title("Log(lambda) vs. Coefficients for LASSO Classifier")
 
-#' Optimal lambda value that maximizes AUC 
-optimal_lambda <- cv.lasso$lambda.min
-# AUC corresponding to optimal lambda
-optimal_auc <- cv.lasso$cvm[cv.lasso$lambda == optimal_lambda]
+#' 1SE lambda value that maximizes AUC 
+se_lambda <- cv.lasso$lambda.1se
+# AUC corresponding to 1SE lambda
+se_auc <- cv.lasso$cvm[cv.lasso$lambda == se_lambda]
 
-#' Coefficients at optimal lambda
-optimal_coefs <- coef(cv.lasso, s = "lambda.min")
+#' Coefficients at 1SE lambda
+se_coefs <- coef(cv.lasso, s = "lambda.1se")
 
 #Extract non-zero coefficients and create a data frame
-optimal_coefs_table <- as.data.frame(as.matrix(optimal_coefs))
-optimal_coefs_table <- data.frame(
-  Predictor = rownames(optimal_coefs_table),
-  Coefficient = optimal_coefs_table[, 1]
+se_coefs_table <- as.data.frame(as.matrix(se_coefs))
+se_coefs_table <- data.frame(
+  Predictor = rownames(se_coefs_table),
+  Coefficient = se_coefs_table[, 1]
 )
 #Remove row names
-rownames(optimal_coefs_table) <- NULL 
+rownames(se_coefs_table) <- NULL 
 
 # Filter to display only non-zero coefficients
-optimal_coefs_table <- optimal_coefs_table[optimal_coefs_table$Coefficient != 0, ]
+se_coefs_table <- se_coefs_table[se_coefs_table$Coefficient != 0, ]
 
+###NOTE - maybe just do the predictors no coefficent since its not standardize 
 kable(
-  optimal_coefs_table, format = "html", digits = 4,
+  se_coefs_table, format = "html", digits = 4,
   col.names = c("Predictor", "Coefficient"),
-  caption = "Optimal Coefficients from Lasso Model"
+  caption = "Coefficients from Lasso Model"
 ) %>%
   kable_styling(
     bootstrap_options = c("striped", "condensed"),
@@ -716,41 +744,37 @@ legend(
   lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
 )
 
-# Cross-validation to find optimal lambda
+# Cross-validation to find 1SE lambda
 set.seed(123)
 cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian")
 
 # Plot cross-validation curve
 plot(cv_lasso22)
 
-# Extract optimal lambda
-optimal_lambda22 <- cv_lasso22$lambda.min
-print(paste("Optimal Lambda:", optimal_lambda22))
+# Extract 1SE lambda
+se_lambda22 <- cv_lasso22$lambda.1se
+print(paste("1SE lambda:", se_lambda22))
 
-# Coefficients at optimal lambda
-optimal_coefs22 <- coef(cv_lasso22, s = "lambda.min")
+# Coefficients at 1SE lambda
+se_coefs22 <- coef(cv_lasso22, s = "lambda.1se")
 
 #Extract non-zero coefficients and create a data frame
-optimal_coefs22_table <- as.data.frame(as.matrix(optimal_coefs22))
-optimal_coefs22_table <- data.frame(
-  Predictor = rownames(optimal_coefs22_table),
-  Coefficient = optimal_coefs22_table[, 1]
+se_coefs22_table <- as.data.frame(as.matrix(se_coefs22))
+se_coefs22_table <- data.frame(
+  Predictor = rownames(se_coefs22_table),
+  Coefficient = se_coefs22_table[, 1]
 )
 
 # Remove row names
-rownames(optimal_coefs22_table) <- NULL  
+rownames(se_coefs22_table) <- NULL  
 
 # Filter to display only non-zero coefficients
-optimal_coefs22_table <- optimal_coefs22_table[optimal_coefs22_table$Coefficient != 0, ]
-
-# Use kable to display the table
-library(knitr)
-library(kableExtra)
+se_coefs22_table <- se_coefs22_table[se_coefs22_table$Coefficient != 0, ]
 
 kable(
-  optimal_coefs22_table, format = "html", digits = 4,
+  se_coefs22_table, format = "html", digits = 4,
   col.names = c("Predictor", "Coefficient"),
-  caption = "Optimal Coefficients from Second Lasso Model"
+  caption = "se Coefficients from Second Lasso Model"
 ) %>%
   kable_styling(
     bootstrap_options = c("striped", "condensed"),
