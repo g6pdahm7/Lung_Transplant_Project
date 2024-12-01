@@ -257,7 +257,9 @@ methods["LAS_score"] <- "pmm"
 methods["Pre_PTT"] <- "pmm"
 
 # Predictors for LAS_score
-predictors_LAS <- c("Age", "Gender", "BMI", "COPD", "Type")
+predictors_LAS <- c("Age", "Gender", "BMI", "COPD", "alpha1_Antitrypsin_Deficiency", 
+                    "Cystic_Fibrosis", "Idiopathic_Pulmonary_Hypertension",
+                    "Interstitial_Lung_Disease", "Pulm_Other", "Type")
 
 # Predictors for Pre_PTT
 predictors_PTT <- c("Pre_Hb", "Pre_Hct", "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_Creatinine")
@@ -296,14 +298,11 @@ data$Pre_PTT <- data_imputed$Pre_PTT
 xyplot(imputed111, LAS_score ~ Gender)
 xyplot(imputed111, Pre_PTT ~ Pre_Hct)
 
-
-
-
-
+#Diagnostic tests - dsitrbution of complete and imputed data needs to be similar
+stripplot(imputed111, pch = c(21, 20), cex = c(1, 1.5))
 
 #' Analysis 
 #' Question 1
-######NEW#######
 
 library(pROC)
 library(tree)
@@ -366,7 +365,7 @@ for (i in 1:5) {
   #Create a vector with the response values
   y_classification <- model1data$Transfusion[training]
 
-    #Train a model
+  #Train a model
   lasso_model_classification <- glmnet(x_classification, y_classification, family = "binomial")
   
   # Plot Lasso plot
@@ -376,7 +375,6 @@ for (i in 1:5) {
     main = paste("Log(lambda) vs. Coefficients for Lasso Iteration of", i),
     xlab = "log(Lambda)", ylab = "Coefficients"
   )
-  
   
   # Create a legend
   legend(
