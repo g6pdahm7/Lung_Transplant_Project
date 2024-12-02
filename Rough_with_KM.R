@@ -725,12 +725,12 @@ plot(
 
 #Create a legend
 legend(
-  "bottomright", legend = rownames(lasso_model22$beta),
+  "topright", legend = rownames(lasso_model22$beta),
   col = colours,  
   lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
 )
 
-#Cross-validation to find optimal lambda
+#Cross-validation to find optimal lambda that minimizes MSE
 set.seed(123)
 cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian")
 
