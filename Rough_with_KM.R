@@ -12,6 +12,9 @@ library(funModeling)
 library(corrplot)
 library(mice)
 library(glmnet)
+library(pastecs)
+library(tidyverse)
+library(kableExtra)
 
 #' Columns that were not highlighted were removed a priori
 #' on Excel. Since we are using Git, the same file should 
@@ -78,6 +81,9 @@ data$Gender <- ifelse(data$Gender == "TRUE", "Male", "Female")
 #' Some initial thoughts: 
 #' Pre_Fibrinogen will have to be excluded due to 
 #' missingness greater than 30%.
+#' 
+####################
+### Cleaning/EDA ###
 
 #' Next, we will perform a simple EDA prior to 
 #' handling the any missingness.
@@ -86,6 +92,60 @@ data$Gender <- ifelse(data$Gender == "TRUE", "Male", "Female")
 #' that states whether or not someone had a transplant.
 data <- data %>%
   mutate(Transfusion = ifelse(Total_24hr_RBC > 0, TRUE, FALSE))
+
+#' Summary table of numeric variables
+desc.data <- stat.desc(dplyr::select_if(data, is.numeric))
+
+desc.data <- desc.data[-c(1,2,3,7,10,11),-c(1,39)] #remove rows and cols with irrelevant descriptive stats
+
+# Render table
+kable(t(desc.data), format = "html", digits = 2, 
+      caption = "Summary of Numeric Variables in Lung Transplant Patients Dataset") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+#' Summary table of categorical data
+#subset categorical variables
+data$Massive_Transfusion <- as.factor(data$Massive_Transfusion)
+character.data <- data %>% select_if(negate(is.numeric))
+character.data <- character.data[,-c(1,17)] #remove OR date, death date
+
+character.data <- character.data %>%
+  mutate(across(everything(), as.character)) #ensure all cols are characters
+
+# Function to summarize categorical variables
+summarize_character_data_combined <- function(df) {
+  # Summarize each column
+  summary_list <- lapply(names(df), function(var) {
+    df %>%
+      count(!!sym(var), name = "Count") %>%
+      mutate(
+        Variable = var,
+        Proportion = round((Count / sum(Count)) * 100, 2)
+      ) %>%
+      rename(Category = !!sym(var)) %>%
+      select(Variable, Category, Count, Proportion)
+  })
+  
+  # Combine all summaries into one dataframe
+  summary_df <- bind_rows(summary_list)
+  
+  # Combine Variable and Category into a single column
+  summary_df <- summary_df %>%
+    mutate(Combined = paste(Variable, Category, sep = " - ")) %>%
+    select(Combined, Count, Proportion)
+  
+  return(summary_df)
+}
+
+summary_table <- summarize_character_data_combined(character.data)
+
+#table of Categorical data
+kable(summary_table, format = "html", caption = "Summary of Categorical Variables", 
+      col.names = c("Variable", "Count","Proportion (%)")) %>%
+      kable_styling(bootstrap_options = "condensed") %>%
+      row_spec(c(1:3, 6:7, 10:11, 14:15, 18:19, 22:23, 26:27, 32:37, 40:41), background = "#f2f2f2") 
+
 
 #' Bar plot for the number of people with and without transfusions
 ggplot(data, aes(x = as.factor(Transfusion))) +
@@ -129,8 +189,89 @@ ggplot(data, aes(x = ALIVE_30DAYS_YN, y = Total_24hr_RBC)) +
   labs(title = "Total RBC Transfusion by 30-Day Survival", x = "Survived 30 Days (Y/N)", y = "Total RBC Units") + 
   theme_minimal()
 
-#' Next, I want to create a simple correlation plot of some of 
-#' the patient characteristics, and some of the general outcomes:
+#histogram length of hospital stay 
+ggplot(data, aes(x = HOSPITAL_LOS)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of Hospital Stay Length", x = "Hospital Stay (days)", y = "Frequency") + 
+  theme_minimal()
+
+#histogram of icu stay length
+ggplot(data, aes(x = ICU_LOS)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of ICU Stay Length", x = "ICU Stay (days)", y = "Frequency") + 
+  theme_minimal()
+
+######################################################
+### Exploring Transfusions/Massive Transfusion Pts ###
+
+#subset data for transfusion and massive transfusion
+data.transfusion <- data %>%
+  filter(Transfusion == "TRUE") 
+data.transfusion$Transfusion <- as.factor(data.transfusion$Transfusion)
+
+data.massive <- data %>%
+  filter(Massive_Transfusion == 1)
+data.massive$Massive_Transfusion <- as.factor(data.massive$Massive_Transfusion)
+data.massive$Transfusion <- as.factor(data.massive$Transfusion)
+
+#' Summary table of numeric variables for pts with transfusions
+desc.transfusion <- stat.desc(dplyr::select_if(data.transfusion, is.numeric))
+
+desc.transfusion <- desc.transfusion[-c(1,2,3,7,10,11),-c(1)] #remove rows and cols with irrelevant descriptive stats
+
+# Render table
+kable(t(desc.transfusion), format = "html", digits = 2, 
+      caption = "Summary of Numeric Data in Lung Transplant Patients who received Transfusion") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+
+#Summarize categorical transfusion data
+char.transfusion <- data.transfusion[, !sapply(data.transfusion, is.numeric), drop = FALSE]
+char.transfusion <- char.transfusion[,-c(1,17,22)] #remove OR date, death date, transfusion status
+char.transfusion <- char.transfusion %>%
+  mutate(across(everything(), as.character)) #ensure all cols are characters
+
+#summarize columns
+summarize_transfusion_data_combined <- function(df) {
+  # Summarize each column
+  summary_list <- lapply(names(df), function(var) {
+    df %>%
+      count(!!sym(var), name = "Count") %>%
+      mutate(
+        Variable = var,
+        Proportion = round((Count / sum(Count)) * 100, 2)
+      ) %>%
+      rename(Category = !!sym(var)) %>%
+      select(Variable, Category, Count, Proportion)
+  })
+  
+  # Combine all summaries into one dataframe
+  summary_df <- bind_rows(summary_list)
+  
+  # Combine Variable and Category into a single column
+  summary_df <- summary_df %>%
+    mutate(Combined = paste(Variable, Category, sep = " - ")) %>%
+    select(Combined, Count, Proportion)
+  
+  return(summary_df)
+}
+
+transfusion_summary_table <- summarize_transfusion_data_combined(char.transfusion)
+
+#Table of transfusion pt characterisitcs
+kable(transfusion_summary_table, format = "html", caption = "Characterisitcs of Patients with Transfusions (Categorical Variables)", 
+      col.names = c("Variable", "Count","Proportion (%)")) %>%
+  kable_styling(bootstrap_options = "condensed") %>%
+  row_spec(c(1:3, 6:7, 10:11, 14:15, 18:19, 22:23, 26:27, 32:37), background = "#f2f2f2") #highlight to group variables
+
+
+
+#######################################
+### Testing collinearity of variables ## 
+
+#' Next, I want to create a simple correlation plot to view if 
+#' variables are correlated with each other
 
 #' Create a new data set to view correction
 correlation_data <- data
@@ -143,13 +284,14 @@ correlation_data$ALIVE_30DAYS_YN <- as.numeric(data$ALIVE_30DAYS_YN == "Y")
 correlation_data$ALIVE_90DAYS_YN <- as.numeric(data$ALIVE_90DAYS_YN == "Y")  
 correlation_data$ALIVE_12MTHS_YN <- as.numeric(data$ALIVE_12MTHS_YN == "Y") 
 
-
 #' Define groups of variables
 group1 <- correlation_data %>%
-  select(Age, Gender, Weight, Height, BMI, Type)
+  select(Age, Gender, Weight, Height, BMI, Type,Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN,
+         Pre_Hb, Pre_Hct, Pre_Platelets, Pre_PT, Pre_INR, Pre_PTT, Pre_Fibrinogen, Pre_Creatinine)
 
 group2 <- correlation_data %>%
-  select(Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN)
+  select(Age, Gender, Weight, Height, BMI, Type,Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN,
+         Pre_Hb, Pre_Hct, Pre_Platelets, Pre_PT, Pre_INR, Pre_PTT, Pre_Fibrinogen, Pre_Creatinine)
 
 #' Compute correlation matrix between group1 and group2
 cor_matrix <- cor(group1, group2, use = "pairwise.complete.obs")
@@ -157,9 +299,29 @@ cor_matrix <- cor(group1, group2, use = "pairwise.complete.obs")
 #' Plot the correlation heatmap
 corrplot(cor_matrix, method = "color", is.corr = TRUE, 
          tl.cex = 0.8, number.cex = 0.7,
-         title = "Correlation Plot Between Predictors and Outcomes",
+         title = "Correlation of Predcitors ",
          mar = c(0, 0, 1, 0))
 
+# Define the threshold for high correlation 
+threshold <- 0.7
+
+# Find variable pairs with absolute correlation above the threshold
+high_corr_pairs <- which(abs(cor_matrix) > threshold & lower.tri(cor_matrix), arr.ind = TRUE)
+
+# Display the variable names and their correlation values
+high_corr_variables <- data.frame(
+  Variable1 = rownames(cor_matrix)[high_corr_pairs[, 1]],
+  Variable2 = colnames(cor_matrix)[high_corr_pairs[, 2]],
+  Correlation = cor_matrix[high_corr_pairs]
+)
+
+print(high_corr_variables)
+
+#thus, we will choose to remove weight, hospital_los, Pre_Hct, Pre_Platelets, Pre_Fibrinogen and Pre_Creatinine from our analysis.
+# We will use BMI, icu_los and Pre_INR
+
+#######################################
+#' Additional cleaning and Imputation #
 
 #' We will now create histograms for the two columns we will impute.
 #' This will help inform the imputation method we will use.
@@ -177,14 +339,6 @@ ggplot(data, aes(x = Pre_PTT)) +
   labs(title = "Distribution of Pre PTT", x = "Pre PTT", y = "Frequency") +
   theme_minimal()
 #' Right skewed
-
-
-###
-### Tailor EDA to answer first part of first question
-### Characteristics of patients that require transfusions.
-###
-
-#' Additional cleaning and Imputation
 
 #' We will start by removing an unnecessary column that is 
 #' redundant with another column for icu stay.
@@ -239,9 +393,7 @@ data <- data %>% select(-ECLS_CPB)
 data <- data %>% mutate_if(is.character, as.factor)
 colnames(data) <- gsub("[#-]", "_", colnames(data))
 
-#' Imputation
-
-
+#' Imputation ##
 #' Converting character variables to factors
 data <- data %>% mutate_if(is.character, as.factor)
 
@@ -257,10 +409,12 @@ methods["LAS_score"] <- "pmm"
 methods["Pre_PTT"] <- "pmm"
 
 # Predictors for LAS_score
-predictors_LAS <- c("Age", "Gender", "BMI", "COPD", "Type")
+predictors_LAS <- c("Age", "Gender", "BMI", "COPD", "alpha1_Antitrypsin_Deficiency", 
+                    "Cystic_Fibrosis", "Idiopathic_Pulmonary_Hypertension",
+                    "Interstitial_Lung_Disease", "Pulm_Other", "Type")
 
 # Predictors for Pre_PTT
-predictors_PTT <- c("Pre_Hb", "Pre_Hct", "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_Creatinine")
+predictors_PTT <- c("Pre_Hb", "Pre_Hct", "Pre_Platelets", "Pre_PT", "Pre_Creatinine")
 
 # Initialize predictor matrix with zeros
 pred_matrix <- make.predictorMatrix(data)
@@ -296,49 +450,348 @@ data$Pre_PTT <- data_imputed$Pre_PTT
 xyplot(imputed111, LAS_score ~ Gender)
 xyplot(imputed111, Pre_PTT ~ Pre_Hct)
 
+#Diagnostic tests - dsitrbution of complete and imputed data needs to be similar
+stripplot(imputed111, pch = c(21, 20), cex = c(1, 1.5))
+
+# Analysis 
+# Objective: Identify predictors that influence the need for transfusions 
 
 
+library(pROC)
+library(tree)
+library(knitr)
+library(kableExtra)
 
+#Assess and compares the performance of the methods (lasso classification vs. CART) using a fraction 
+#of the original data that was not used for training/tuning.
+#The best model (highest AUC score) will be used for further analysis.
 
+#Let's check the performance of LASSO classification model
+#LASSO CLASSIFICATION 
 
-#' Analysis 
+#Set the seed
+set.seed(111)
 
-
-
-################# LASSO CLASSIFICATION
 
 #' Next we are going to identify the predictors that 
 #' we will be using in the Lasso classification model. 
+
 x <- c(
-  "Type", "Gender", "Height", "Weight", "Age", "BMI", "COPD",
+  "Type", "Gender", "Height", "Age", "BMI", "COPD",
   "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
   "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
   "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
-  "Preoperative_ECLS", "LAS_score", "Pre_Hb", "Pre_Hct",
-  "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_PTT", "Pre_Creatinine"
+  "Preoperative_ECLS", "LAS_score", "Pre_INR"
 )
 
-#' Subsetting the model data
+# Sub-setting the model data to include the predictors and "Transfusion" variable 
 model1data <- data[, c(x, "Transfusion")]
 
-#' Next we need to make the matrix for the predictors, 
-#' with dummy variables.
-x <- model.matrix(Transfusion ~ ., data = model1data)
+#Ensure "Transfusion" variable is factorized 
+model1data$Transfusion <- as.factor(model1data$Transfusion)
 
-y <- as.numeric(model1data$Transfusion) - 1
+#Create an empty list to store the final predictors
+lasso_classi_predictor <- list()
 
-#' Train the model (hopefully it works lol)
+#Create an empty vector to store the final AUC output
+lasso_classi_auc <- c()
 
-modelxx1 <- glmnet(x, y, family = "binomial")
-plot(modelxx1,label = T, xvar = "lambda")
-
-# Define 27 custom hex colors
+# Define 27 custom hex colors for plotting
 colours <- c(
   "#195d90", "#297022", "#b91c16", "#cc6600", "#52267d", "#8c4a20", "#7ca6c2",
   "#8eb072", "#c47272", "#cc9933", "#9b94ac", "#cccc66", "#6da395", "#cccc80",
   "#958094", "#cc665b", "#6686a4", "#cc8a4e", "#8aa24f", "#cc9ab5", "#a1a1a1",
   "#9c66a1", "#a2cca0", "#ccba59", "#52907e", "#cc7250", "#6e80a4"
 )
+
+#LASSO CLASSIFER
+
+#For loop to look at the average AUC for the Lasso classifer
+for (i in 1:5) {
+  
+  #The training and testing set will be a standard 80/20 training/testing split
+  #80% of the data will be for training and 20% will be for testing
+  #Create a vector of row indices that corresponds to the training set
+  #The for loop will create 5 unique training sets
+  training <- sample(nrow(model1data), round(nrow(model1data) * 0.8))
+  
+  #Create a dummy variable for categorical variables and keeping the continuous variables the same 
+  x_classification <- model.matrix(Transfusion ~., model1data)[training, -1]
+  
+  #Create a vector with the response values
+  y_classification <- model1data$Transfusion[training]
+
+  #Train a model
+  lasso_model_classification <- glmnet(x_classification, y_classification, family = "binomial")
+  
+  #Plot Lasso plot
+  plot(
+    lasso_model_classification, xvar = "lambda", label = TRUE, col = colours, 
+    lwd = 1,
+    main = paste("Log(lambda) vs. Coefficients for Lasso Iteration of", i),
+    xlab = "log(Lambda)", ylab = "Coefficients"
+  )
+  
+  #Create a legend
+  legend(
+    "topright", legend = rownames(lasso_model_classification$beta),
+    col = colours,  
+    lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
+  )
+  
+  #Perform cross-validation to select the lambda that maximizes AUC 
+  cv_classification <- cv.glmnet(x_classification, y_classification, family = "binomial", type.measure = "auc")
+  
+  #Plot the curve
+  plot(cv_classification)
+  title(paste("Cross-Validation Plot for Lasso Classifier of", i))
+  
+  #Optimal lambda that maximizes the AUC
+  optimal_lambda <- cv_classification$lambda.min
+  
+  #Train a model using the optimal lambda
+  lasso_model_classification_final <- glmnet(x_classification, y_classification, family = "binomial", lambda = optimal_lambda)
+  
+  #Look at the value of the features that stay in the model when using the optimal lambda
+  coef_min_classification <- coef(cv_classification, s = "lambda.min")
+  
+  #List the selected predictors that stayed in the model
+  lasso_classi_predictor[[i]] <- rownames(coef_min_classification)[coef_min_classification[, 1] != 0][-1]
+  
+  #Test the model on the testing data set and get the predicted probability 
+  lasso_class_predict <- as.numeric(predict(lasso_model_classification_final, newx = model.matrix(Transfusion ~., model1data)[-training,-1], 
+                                            s = optimal_lambda, type = "response"))
+  
+  #Generate the ROC curve for the testing data set 
+  roc_class <- roc(model1data$Transfusion[-training], lasso_class_predict)
+  
+  #Plot ROC curve 
+  plot(roc_class)
+  title(paste("AUC-ROC curve (Lasso) of", i))
+  
+  #List the resulting AUC value from each loop's model
+  lasso_classi_auc[i] <- roc_class$auc
+  
+}
+
+#Convert the predictors list to a data frame for better visualization (table)
+lasso_class_predictors_table <- data.frame(Iteration = 1:5, Predictors = sapply(lasso_classi_predictor, toString))
+kable(
+  lasso_class_predictors_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "Predictors"),
+  caption = "Lasso Classifiers - Selected Predictors for Each Iteration"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+#Check how common each predictors appears 
+
+#Flatten the list of predictors and count the frequency of each predictor
+predictor_list <- unlist(lasso_classi_predictor)
+predictor_freq <- table(predictor_list)
+
+#Sort the frequencies in descending order
+predictor_freq_sorted <- sort(predictor_freq, decreasing = TRUE)
+
+#View the sorted frequency table
+predictor_freq_sorted
+
+#Convert the AUC values to a data frame (table)
+lasso_classi_auc_table <- data.frame(Iteration = 1:5, AUC = lasso_classi_auc)
+
+#Visualize table with kable
+kable(
+  lasso_classi_auc_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "AUC"),
+  caption = "Lasso Classifiers - AUC for Each Iteration"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE, position = "center")
+
+#Calculate the average AUC
+lasso_classi_auc_average <- round(mean(lasso_classi_auc), digits = 3)
+
+#Let's check the performance of CART model (full and pruned tree)
+###CART (full and pruned)
+#Create an empty list to store the variables from the CART model - full tree
+tree_classi_predictors <- list()
+
+#Create an empty vector to store the AUC output - full tree 
+tree_classi_auc <- c()
+
+#Create an empty list to store the variables from the CART model - full tree
+prune_classi_predictors <- list()
+
+#Create an empty vector to store the AUC output - full tree 
+prune_classi_auc <- c()
+
+#For loop to look at the CART model for each iteration of the data
+for (i in 1:5) {
+  
+  #The training and testing set will be a standard 80/20 training/testing split
+  #80% of the data will be for training and 20% will be for testing
+  #Create a vector of row indices that corresponds to the training set
+  #The for loop will create 5 unique training sets
+  training <- sample(nrow(model1data), round(nrow(model1data) * 0.8))
+  
+  #Training CART
+  tree_model <- tree(Transfusion ~ ., data = model1data, subset = training)
+  plot(tree_model)
+  title(paste("Full Tree Model of", i))
+  text(tree_model, pretty=0)
+  
+  #Perform cross-validation to prune the tree using deviance 
+  cv_tree <- cv.tree(tree_model, FUN = prune.tree, method = "deviance")
+  
+  #Find the best size of the tree for pruning associated with the lowest deviance 
+  best_size <- cv_tree$size[which.min(cv_tree$dev)]
+  
+  #Prune the tree to the best size
+  #Best size is set to 2 to avoid a "stump"
+  pruned_tree <- prune.tree(tree = tree_model, best = 2)
+  
+  #Plot the tree
+  plot(pruned_tree)
+  title(paste("Pruned Tree Model of", i))
+  text(pruned_tree, pretty=0)
+  
+  #Extract the variables that were used in the final model
+  variable_prune <- unique(pruned_tree$frame$var[pruned_tree$frame$var != "<leaf>"])
+  prune_classi_predictors[[i]] <- variable_prune
+  
+  #Predict using the pruned tree model
+  tree_prune_predict <- predict(pruned_tree, newdata = model1data[-training,], type = "vector")
+  
+  #Extract the predicted probability 
+  pred_probs_prune_tree <- as.numeric(tree_prune_predict[,2])
+  
+  #Generate the ROC curve for testing - pruned tree
+  roc_prune <-  roc(model1data$Transfusion[-training] ~ pred_probs_prune_tree)
+  plot(roc_prune)
+  title(paste("AUC-ROC Curve (Prune) of", i))
+  prune_classi_auc[i] <- roc_prune$auc
+  
+  #Let's do the same evaluation for the original tree without pruning 
+  #Extract the variables that were used in the tree model without pruning
+  variable_tree <- unique(tree_model$frame$var[tree_model$frame$var != "<leaf>"])
+  tree_classi_predictors[[i]] <- variable_tree
+  
+  #Predict using the full tree model
+  tree_predict <- predict(tree_model, newdata = model1data[-training,], type = "vector")
+  
+  #Extract the predicted probability 
+  pred_probs_tree <- as.numeric(tree_predict[,2])
+  
+  #Generate the ROC curve for testing 
+  roc_tree <-  roc(model1data$Transfusion[-training] ~ pred_probs_tree)
+  plot(roc_tree)
+  title(paste("AUC-ROC Curve (Full) of", i))
+  tree_classi_auc[i] <- roc_tree$auc
+  
+}
+
+#Convert the predictors list to a data frame for better visualization (table) - full tree
+tree_classi_predictors_table <- data.frame(Iteration = 1:5, Variables = sapply(tree_classi_predictors, toString))
+
+kable(
+  tree_classi_predictors_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "Predictors"),
+  caption = "CART Tree - Selected Predictors for Each Iteration"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+#Check how common each predictors appears 
+
+#Flatten the list of predictors and count the frequency of each predictor
+all_tree_predictors <- unlist(tree_classi_predictors)
+tree_predictor_freq <- table(all_tree_predictors)
+
+#Sort the frequencies in descending order
+tree_predictor_freq_sorted <- sort(tree_predictor_freq, decreasing = TRUE)
+
+#Display the sorted frequency of predictors
+tree_predictor_freq_sorted
+
+#Convert the AUC values to a data frame (table) - full tree
+tree_auc_table <- data.frame(Iteration = 1:5, AUC = tree_classi_auc)
+
+kable(
+  tree_auc_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "AUC"),
+  caption = "CART Tree - AUC for Each Iteration"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE, position = "center")
+
+
+#Calculate the average AUC - full tree 
+tree_auc_average <- round(mean(tree_classi_auc), digits = 3)
+
+#Convert the predictors list to a data frame for better visualization (table) - prune tree
+prune_predictors_table <- data.frame(Iteration = 1:5, Variables = sapply(prune_classi_predictors, toString))
+
+kable(
+  prune_predictors_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "Predictors"),
+  caption = "CART Pruned Tree - Selected Predictors for Each Iteration"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center")
+
+#Convert the AUC values to a data frame (table) - prune tree
+prune_auc_table <- data.frame(Iteration = 1:5, AUC = prune_classi_auc)
+
+kable(
+  prune_auc_table, format = "html", digits = 2, 
+  col.names = c("Iteration", "AUC"),
+  caption = "CART Pruned Tree - AUC for Each Iteration"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE, position = "center")
+
+#Calculate the average AUC - prune tree 
+prune_auc_average <- round(mean(prune_classi_auc), digits = 3)
+
+#Combine AUC values into a single data frame
+auc_comparison_table <- data.frame(
+  Model = c("LASSO Classification", "CART Tree", "CART Pruned Tree"),
+  Average_AUC = c(
+    lasso_classi_auc_average, 
+    round(mean(tree_classi_auc), digits = 3), 
+    prune_auc_average
+  )
+)
+
+kable(
+  auc_comparison_table, format = "html", digits = 3, 
+  col.names = c("Model", "Average AUC"),
+  caption = "Comparison of Average AUC Across Models"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  )
+
+#The lasso model had a higher average AUC - proceeding with lasso classification
+#for further analysis
+
+################# LASSO CLASSIFICATION
+
+#Let's fit a lasso classification model with all of the data.
+
+#Using the same predictors and subset data as above, we will
+#make the matrix for the predictors, with dummy variables.
+x <- model.matrix(Transfusion ~ ., data = model1data)
+
+y <- as.numeric(model1data$Transfusion) - 1
+
+#' Train the model
+modelxx1 <- glmnet(x, y, family = "binomial")
 
 # Plot the Lasso paths 
 plot(
@@ -348,47 +801,63 @@ plot(
   xlab = "log(Lambda)", ylab = "Coefficients"
 )
 
-# Create a custom legend
+# Create a legend
 legend(
   "topright", legend = rownames(modelxx1$beta),
   col = colours,  
   lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
 )
 
-
 #' Setting seed for reproducibility and doing cross-validation.
 set.seed(123)
-cv.lasso <- cv.glmnet(x, y, nfolds = 5)
+cv.lasso <- cv.glmnet(x, y, nfolds = 5, alpha = 1,family = "binomial", type.measure = "auc")
 
 #' Plotting MSE vs log lambda
 plot(cv.lasso)
+title("Log(lambda) vs. Coefficients for LASSO Classifier")
 
-
-#' Optimal lambda value that minimizes MSE
+#' Optimal lambda value that maximizes AUC 
 optimal_lambda <- cv.lasso$lambda.min
-# MSE corresponding to optimal lambda
-optimal_mse <- cv.lasso$cvm[cv.lasso$lambda == optimal_lambda]
+# AUC corresponding to optimal lambda
+optimal_auc <- cv.lasso$cvm[cv.lasso$lambda == optimal_lambda]
 
 #' Coefficients at optimal lambda
 optimal_coefs <- coef(cv.lasso, s = "lambda.min")
-print(optimal_coefs)
 
+#Extract non-zero coefficients that stayed in the mode when using optimal lambda
+optimal_lasso_predictors <- rownames(optimal_coefs)[optimal_coefs[, 1] != 0][-1]
 
-
+#Convert the predictors list to a data frame for better visualization (table)
+final_lasso_class_predictors_table <- data.frame(Predictors = optimal_lasso_predictors)
+kable(
+  final_lasso_class_predictors_table, format = "html", digits = 2, 
+  col.names = c("Predictors"),
+  caption = "Lasso Classifiers - Final Selected Predictors"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
 
 ################### Model 2: Continuous outcome.
+#' Identical process to the one used above, just  
+#' different family.
+
+#TOTAL RBC
+set.seed(123)
+
+#LASSO REGRESSION
+
 #' Identical process to the one used above, just 
 #' different family.
 
 # Define predictors and outcome with updated variable names
 predictors22 <- c(
-  "Type", "Gender", "Height", "Weight", "Age", "BMI", "COPD",
+  "Type", "Gender", "Height", "Age", "BMI", "COPD",
   "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
   "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
   "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
-  "Preoperative_ECLS", "LAS_score", "Pre_Hb", "Pre_Hct",
-  "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_PTT", "Pre_Creatinine"
+  "Preoperative_ECLS", "LAS_score", "Pre_INR"
 )
+
 
 # Subset data for the new model
 model22data <- data[, c(predictors22, "Total_24hr_RBC")]
@@ -397,13 +866,10 @@ model22data <- data[, c(predictors22, "Total_24hr_RBC")]
 x22 <- model.matrix(Total_24hr_RBC ~ ., data = model22data)[, -1]
 y22 <- model22data$Total_24hr_RBC
 
-# Train Lasso model
+#Train Lasso model
 lasso_model22 <- glmnet(x22, y22, family = "gaussian")
 
-# Plot coefficients vs log(lambda)
-#plot(lasso_model22, xvar = "lambda", label = TRUE)
-
-# Plot Lasso plot
+#Plot coefficients vs log(lambda) - Lasso Path
 plot(
   lasso_model22, xvar = "lambda", label = TRUE, col = colours, 
   lwd = 1,
@@ -411,102 +877,41 @@ plot(
   xlab = "log(Lambda)", ylab = "Coefficients"
 )
 
-# Create a custom legend
+#Create a legend
 legend(
-  "bottomright", legend = rownames(lasso_model22$beta),
+  "topright", legend = rownames(lasso_model22$beta),
   col = colours,  
   lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
 )
 
-
-
-# Cross-validation to find optimal lambda
+#Cross-validation to find optimal lambda that minimizes MSE
 set.seed(123)
-cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian", nfolds = 5)
+cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian")
 
-# Plot cross-validation curve
+#Plot cross-validation curve
 plot(cv_lasso22)
+#title(main = "Cross-Validation Plot for Lasso Classifier")
 
-# Extract optimal lambda
+#Extract optimal lambda
 optimal_lambda22 <- cv_lasso22$lambda.min
-print(paste("Optimal Lambda:", optimal_lambda22))
+print(paste("optimal lambda:", optimal_lambda22))
 
-# Coefficients at optimal lambda
+#Coefficients at optimal lambda
 optimal_coefs22 <- coef(cv_lasso22, s = "lambda.min")
-print(optimal_coefs22)
 
+#Extract non-zero coefficients that stayed in the mode when using optimal lambda
+optimal_reg_predictors <- rownames(optimal_coefs22)[optimal_coefs22[, 1] != 0][-1]
 
+#Convert the predictors list to a data frame for better visualization (table)
+lasso_reg_predictors_table <- data.frame(Predictors = optimal_reg_predictors)
 
-################# Model 3: Lasso Classification with Massive Transfusions
-
-#' Next we are going to identify the predictors that 
-#' we will be using in the Lasso classification model. 
-predictors33 <- c(
-  "Type", "Gender", "Height", "Weight", "Age", "BMI", "COPD",
-  "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
-  "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
-  "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
-  "Preoperative_ECLS", "LAS_score", "Pre_Hb", "Pre_Hct",
-  "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_PTT", "Pre_Creatinine"
-)
-
-#' Subsetting the model data
-model3data <- data[, c(predictors33, "Massive_Transfusion")]
-
-#' Next we need to make the matrix for the predictors, 
-#' with dummy variables.
-x33 <- model.matrix(Massive_Transfusion ~ ., data = model3data)
-
-y33 <- as.numeric(model3data$Massive_Transfusion) - 1
-
-#' Train the model
-
-modelxx3 <- glmnet(x33, y33, family = "binomial")
-
-#plot(modelxx3,label = T, xvar = "lambda")
-
-# Plot the Lasso paths 
-plot(
-  modelxx3, xvar = "lambda", label = TRUE, col = colours, 
-  lwd = 1,
-  main = "Lasso Paths",
-  xlab = "log(Lambda)", ylab = "Coefficients"
-)
-
-# Create a custom legend
-legend(
-  "bottomright", legend = rownames(modelxx3$beta),
-  col = colours,  
-  lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
-)
-
-
-#' Setting seed for reproducibility and doing cross-validation.
-set.seed(123)
-cv_lasso_mt <- cv.glmnet(x33, y33, nfolds = 5)
-
-#' Plotting MSE vs log lambda
-plot(cv_lasso_mt)
-
-
-#' Optimal lambda value that minimizes MSE
-optimal_lambda_mt <- cv_lasso_mt$lambda.min
-# MSE corresponding to optimal lambda
-optimal_mse_mt <- cv_lasso_mt$cvm[cv_lasso_mt$lambda == optimal_lambda]
-
-#' Coefficients at optimal lambda
-optimal_coefs_mt <- coef(cv_lasso_mt, s = "lambda.min")
-print(optimal_coefs_mt)
-
-###
-### Combine Transfusion and Massive Transfusion into one variable with 3 levels. 
-### Make one Lasso.
-###
-
-###
-### Be ready to answer the question: 
-### Why Lasso, why not tree, why not logistic/linear regression?
-###
+kable(
+  lasso_reg_predictors_table, format = "html", digits = 2, 
+  col.names = c("Predictors"),
+  caption = "Lasso Regression - Final Selected Predictors"
+) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
 
 ######################### Q2
 
@@ -678,4 +1083,5 @@ boxplot(ICU_LOS ~ Transfusion, data = data,
         ylab = "ICU Length of Stay (days)",
         col = c("steelblue", "tomato"),
         ylim = c(0, 25))
+
 
