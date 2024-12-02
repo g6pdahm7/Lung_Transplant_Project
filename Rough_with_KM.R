@@ -325,14 +325,12 @@ set.seed(111)
 #' Next we are going to identify the predictors that 
 #' we will be using in the Lasso classification model. 
 
-#FIX: add new set of predictors 
 x <- c(
   "Type", "Gender", "Height", "Age", "BMI", "COPD",
   "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
   "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
   "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
-  "Preoperative_ECLS", "LAS_score", "Pre_Hb",
-  "Pre_Platelets", "Pre_PT", "Pre_PTT", "Pre_Creatinine"
+  "Preoperative_ECLS", "LAS_score", "Pre_INR"
 )
 
 # Sub-setting the model data to include the predictors and "Transfusion" variable 
@@ -703,9 +701,9 @@ predictors22 <- c(
   "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
   "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
   "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
-  "Preoperative_ECLS", "LAS_score", "Pre_Hb",
-  "Pre_Platelets", "Pre_PT", "Pre_PTT", "Pre_Creatinine"
+  "Preoperative_ECLS", "LAS_score", "Pre_INR"
 )
+
 
 # Subset data for the new model
 model22data <- data[, c(predictors22, "Total_24hr_RBC")]
