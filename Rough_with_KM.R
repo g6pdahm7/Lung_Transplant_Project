@@ -33,6 +33,44 @@ data <- read_excel("transfusion_data.xlsx")
 #View(data)
 status(data)
 
+# Create a table with the variable categories and its respective variables
+variable_categories <- data.frame(
+  Variable_Category = c(
+    "Patient Demographic Data", 
+    "Underlying Respiratory Diagnosis and Intraoperative Descriptions", 
+    "Life Support", 
+    "Blood Product Transfusion Data", 
+    "Survival and ICU Length of Stay"
+  ),
+  Extracted_Variables = c(
+    "1. Gender\n2. Height\n3. Weight\n4. Age\n5. Body Mass Index (BMI)",
+    "1. Chronic obstructive pulmonary disease (COPD)\n2. alpha1-Antitrypsin Deficiency\n3. Cystic Fibrosis\n4. Idiopathic Pulmonary Hypertension\n5. Interstitial Lung Disease\n6. Other Pulmonary Disease\n7. First Lung Transplant\n8. Redo Lung Transplant\n9. ExVIVO Lung Perfusion\n10. Preoperative Extracorporeal Life Support (ECLS)\n11. Lung Allocation Score (LAS score)\n12. Intraoperative ECLS",
+    "1. ECLS Extracorporeal Membrane Oxygenation (ECMO)\n2. ECLS Cardiopulmonary Bypass (CPB)",
+    "1. Intra Fresh Frozen Plasma\n2. Intra Packed Cells\n3. Intra Platelets\n4. Intra Cryoprecipitate\n5. Red Blood Cell (RBC) 0-24hrs\n6. RBC 24-48hrs\n7. RBC 48-72hrs\n8. RBC 72hr Total\n9. Fresh Frozen Plasma (FFP) 0-24hrs\n10. FFP 24-48hrs\n11. FFP 48-72hrs\n12. FFP 72hr Total\n13. Platelet (Plt) 0-24hrs\n14. Plt 24-48hrs\n15. Plt 48-72hrs\n16. Plt 72hr Total\n17. Cryoprecipitate (Cryo) 0-24hrs\n18. Cryo 24-48hrs\n19. Cryo 48-72hrs\n20. Cryo 72hr Total\n21. Total 24hr RBC\n22. Massive Transfusion",
+    "1. Duration of ICU Stay (days)\n2. Death Date\n3. Alive by 30 days\n4. Alive by 90 days\n5. Alive by 12 months\n6. ICU Length of Stay (LOS)\n7. Hospital LOS"
+  )
+)
+
+# Create table using gt package
+variable_categories %>%
+  gt() %>%
+  tab_header(
+    title = "Variable Categories and Extracted Variables"
+  ) %>%
+  cols_label(
+    Variable_Category = "Variable Category",
+    Extracted_Variables = "Extracted Variables"
+  ) %>%
+  tab_options(
+    table.width = pct(100),  # Adjust table width as needed
+    table.font.size = "small"
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(columns = everything())
+  )
+
+
 #' Remove unnecessary columns
 #' columns_to_remove <- c(
 #  "TX DB ID", "OR Date", "Coronary Artery Disease", "Hypertension",
@@ -792,14 +830,27 @@ prune_predictors_table %>%
 #Convert the AUC values to a data frame (table) - prune tree
 prune_auc_table <- data.frame(Iteration = 1:5, AUC = prune_classi_auc)
 
-kable(
-  prune_auc_table, format = "html", digits = 2, 
-  col.names = c("Iteration", "AUC"),
-  caption = "CART Pruned Tree - AUC for Each Iteration"
-) %>%
-  kable_styling(
-    bootstrap_options = c("striped", "condensed"),
-    full_width = FALSE, position = "center")
+prune_auc_table %>%
+  gt() %>%
+  tab_header(
+    title = "CART Pruned Tree - AUC for Each Iteration"
+  ) %>%
+  cols_label(
+    Iteration = "Iteration",
+    AUC = "AUC"
+  ) %>%
+  fmt_number(
+    columns = AUC,
+    decimals = 2
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(75)
+  )
 
 #Calculate the average AUC - prune tree 
 prune_auc_average <- round(mean(prune_classi_auc), digits = 3)
@@ -814,15 +865,27 @@ auc_comparison_table <- data.frame(
   )
 )
 
-kable(
-  auc_comparison_table, format = "html", digits = 3, 
-  col.names = c("Model", "Average AUC"),
-  caption = "Comparison of Average AUC Across Models"
-) %>%
-  kable_styling(
-    bootstrap_options = c("striped", "condensed"),
-    full_width = FALSE,
-    position = "center"
+# Create the table with gt
+auc_comparison_table %>%
+  gt() %>%
+  tab_header(
+    title = "Comparison of Average AUC Across Models"
+  ) %>%
+  cols_label(
+    Model = "Model",
+    Average_AUC = "Average AUC"
+  ) %>%
+  fmt_number(
+    columns = vars(Average_AUC),
+    decimals = 3
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(75)
   )
 
 #The lasso model had a higher average AUC - proceeding with lasso classification
@@ -877,13 +940,24 @@ optimal_lasso_predictors <- rownames(optimal_coefs)[optimal_coefs[, 1] != 0][-1]
 
 #Convert the predictors list to a data frame for better visualization (table)
 final_lasso_class_predictors_table <- data.frame(Predictors = optimal_lasso_predictors)
-kable(
-  final_lasso_class_predictors_table, format = "html", digits = 2, 
-  col.names = c("Predictors"),
-  caption = "Lasso Classifiers - Final Selected Predictors"
-) %>%
-  kable_styling(bootstrap_options = c("striped", "condensed"), 
-                full_width = FALSE, position = "center") 
+
+# Create the table with gt
+final_lasso_class_predictors_table %>%
+  gt() %>%
+  tab_header(
+    title = "Lasso Classifiers - Final Selected Predictors"
+  ) %>%
+  cols_label(
+    Predictors = "Predictors"
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(50)  # Adjust width as needed
+  )
 
 ################### Model 2: Continuous outcome.
 #' Identical process to the one used above, just  
