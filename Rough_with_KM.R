@@ -14,6 +14,7 @@ library(mice)
 library(glmnet)
 library(pastecs)
 library(tidyverse)
+library(kableExtra)
 
 #' Columns that were not highlighted were removed a priori
 #' on Excel. Since we are using Git, the same file should 
@@ -95,38 +96,24 @@ data <- data %>%
 #' Summary table of numeric variables
 desc.data <- stat.desc(dplyr::select_if(data, is.numeric))
 
-desc.data <- desc.data[-c(1,2,3,7,10,11),-c(1)] #remove rows and cols with irrelevant descriptive stats
+desc.data <- desc.data[-c(1,2,3,7,10,11),-c(1,39)] #remove rows and cols with irrelevant descriptive stats
 
-# Split the data into smaller parts (e.g., 10 columns each)
-desc.1 <- desc.data[,c(1:13)]
-desc.2 <- desc.data[,c(14:26)]
-desc.3 <- desc.data[,c(27:37)]
-
-# Render each subset as a separate table for better formatting
-kable(desc.1, format = "html", digits = 2, 
-      caption = "Descriptive Statistics for Numeric Data in Lung Transplant Patients Dataset") %>%
+# Render table
+kable(t(desc.data), format = "html", digits = 2, 
+      caption = "Summary of Numeric Variables in Lung Transplant Patients Dataset") %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), 
                 full_width = FALSE, position = "center") 
 
-kable(desc.2, format = "html", digits = 2, 
-      caption = "Descriptive Statistics for Numeric Data in Lung Transplant Patients Dataset") %>%
-  kable_styling(bootstrap_options = c("striped", "condensed"), 
-                full_width = FALSE, position = "center") 
-
-kable(desc.3, format = "html", digits = 2, 
-      caption = "Descriptive Statistics for Numeric Data in Lung Transplant Patients Dataset") %>%
-  kable_styling(bootstrap_options = c("striped", "condensed"), 
-                full_width = FALSE, position = "center") 
-
-#' Summary table of count data
-#subset non-numerical variables
+#' Summary table of categorical data
+#subset categorical variables
+data$Massive_Transfusion <- as.factor(data$Massive_Transfusion)
 character.data <- data %>% select_if(negate(is.numeric))
 character.data <- character.data[,-c(1,17)] #remove OR date, death date
 
 character.data <- character.data %>%
   mutate(across(everything(), as.character)) #ensure all cols are characters
 
-# Function to summarize non-numerical variables
+# Function to summarize categorical variables
 summarize_character_data_combined <- function(df) {
   # Summarize each column
   summary_list <- lapply(names(df), function(var) {
@@ -153,11 +140,11 @@ summarize_character_data_combined <- function(df) {
 
 summary_table <- summarize_character_data_combined(character.data)
 
-#table of non-numerical data
-kable(summary_table, format = "html", caption = "Summary of Non-Numeric Variables", 
+#table of Categorical data
+kable(summary_table, format = "html", caption = "Summary of Categorical Variables", 
       col.names = c("Variable", "Count","Proportion (%)")) %>%
       kable_styling(bootstrap_options = "condensed") %>%
-      row_spec(c(1:3, 6:7, 10:11, 14:15, 18:19, 22:23, 26:27, 32:37), background = "#f2f2f2") 
+      row_spec(c(1:3, 6:7, 10:11, 14:15, 18:19, 22:23, 26:27, 32:37, 40:41), background = "#f2f2f2") 
 
 
 #' Bar plot for the number of people with and without transfusions
@@ -227,10 +214,21 @@ data.massive <- data %>%
 data.massive$Massive_Transfusion <- as.factor(data.massive$Massive_Transfusion)
 data.massive$Transfusion <- as.factor(data.massive$Transfusion)
 
-#### Descriptive Characteristics of people with transfusions
-char.transfusion <- data.transfusion %>% select_if(negate(is.numeric))
-char.transfusion <- char.transfusion[,-c(1,17,21)] #remove OR date, death date
+#' Summary table of numeric variables for pts with transfusions
+desc.transfusion <- stat.desc(dplyr::select_if(data.transfusion, is.numeric))
 
+desc.transfusion <- desc.transfusion[-c(1,2,3,7,10,11),-c(1)] #remove rows and cols with irrelevant descriptive stats
+
+# Render table
+kable(t(desc.transfusion), format = "html", digits = 2, 
+      caption = "Summary of Numeric Data in Lung Transplant Patients who received Transfusion") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+
+#Summarize categorical transfusion data
+char.transfusion <- data.transfusion[, !sapply(data.transfusion, is.numeric), drop = FALSE]
+char.transfusion <- char.transfusion[,-c(1,17,22)] #remove OR date, death date, transfusion status
 char.transfusion <- char.transfusion %>%
   mutate(across(everything(), as.character)) #ensure all cols are characters
 
@@ -262,30 +260,18 @@ summarize_transfusion_data_combined <- function(df) {
 transfusion_summary_table <- summarize_transfusion_data_combined(char.transfusion)
 
 #Table of transfusion pt characterisitcs
-kable(transfusion_summary_table, format = "html", caption = "Characterisitcs of Patients with Transfusions (Non-Numeric Variables)", 
+kable(transfusion_summary_table, format = "html", caption = "Characterisitcs of Patients with Transfusions (Categorical Variables)", 
       col.names = c("Variable", "Count","Proportion (%)")) %>%
   kable_styling(bootstrap_options = "condensed") %>%
   row_spec(c(1:3, 6:7, 10:11, 14:15, 18:19, 22:23, 26:27, 32:37), background = "#f2f2f2") #highlight to group variables
 
 
 
+#######################################
+### Testing collinearity of variables ## 
 
-#there may be a differences in hospital & icu LOS, and LAS scores for transfusion and massive transfusion 
-# vs no tranfusion; lets explore this 
-
-#################################################################
-### Exploring differences in pt. characteristics of transfusion #
-#        & massive transfusion vs no transfusion
-
-
-
-
-
-##################
-## Correlations ## MAUSAM CHECK!!!!!!!!!!!!!!!
-
-#' Create a simple correlation plot of some of 
-#' the patient characteristics, and some of the general outcomes:
+#' Next, I want to create a simple correlation plot to view if 
+#' variables are correlated with each other
 
 #' Create a new data set to view correction
 correlation_data <- data
@@ -300,20 +286,39 @@ correlation_data$ALIVE_12MTHS_YN <- as.numeric(data$ALIVE_12MTHS_YN == "Y")
 
 #' Define groups of variables
 group1 <- correlation_data %>%
-  select(Age, Gender, Weight, Height, BMI, Type)
+  select(Age, Gender, Weight, Height, BMI, Type,Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN,
+         Pre_Hb, Pre_Hct, Pre_Platelets, Pre_PT, Pre_INR, Pre_PTT, Pre_Fibrinogen, Pre_Creatinine)
 
 group2 <- correlation_data %>%
-  select(Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN)
+  select(Age, Gender, Weight, Height, BMI, Type,Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN,
+         Pre_Hb, Pre_Hct, Pre_Platelets, Pre_PT, Pre_INR, Pre_PTT, Pre_Fibrinogen, Pre_Creatinine)
 
-## CHECK THISSSSSSS ALL THE CORRELATION STUFF
 #' Compute correlation matrix between group1 and group2
 cor_matrix <- cor(group1, group2, use = "pairwise.complete.obs")
 
 #' Plot the correlation heatmap
 corrplot(cor_matrix, method = "color", is.corr = TRUE, 
          tl.cex = 0.8, number.cex = 0.7,
-         title = "Correlation Plot Between Predictors and Outcomes",
+         title = "Correlation of Predcitors ",
          mar = c(0, 0, 1, 0))
+
+# Define the threshold for high correlation 
+threshold <- 0.7
+
+# Find variable pairs with absolute correlation above the threshold
+high_corr_pairs <- which(abs(cor_matrix) > threshold & lower.tri(cor_matrix), arr.ind = TRUE)
+
+# Display the variable names and their correlation values
+high_corr_variables <- data.frame(
+  Variable1 = rownames(cor_matrix)[high_corr_pairs[, 1]],
+  Variable2 = colnames(cor_matrix)[high_corr_pairs[, 2]],
+  Correlation = cor_matrix[high_corr_pairs]
+)
+
+print(high_corr_variables)
+
+#thus, we will choose to remove weight, hospital_los, Pre_Hct, Pre_Platelets, Pre_Fibrinogen and Pre_Creatinine from our analysis.
+# We will use BMI, icu_los and Pre_INR
 
 #######################################
 #' Additional cleaning and Imputation #
