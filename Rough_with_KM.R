@@ -15,6 +15,10 @@ library(glmnet)
 library(pastecs)
 library(tidyverse)
 library(kableExtra)
+library(gt)
+library(pROC)
+library(tree)
+library(knitr)
 
 #' Columns that were not highlighted were removed a priori
 #' on Excel. Since we are using Git, the same file should 
@@ -149,7 +153,7 @@ kable(summary_table, format = "html", caption = "Summary of Categorical Variable
 
 #' Bar plot for the number of people with and without transfusions
 ggplot(data, aes(x = as.factor(Transfusion))) +
-  geom_bar(fill = "steelblue", color = "black") +
+  geom_bar(fill = "lightblue", color = "black") +
   labs(
     title = "Number of People Who Had Transfusions",
     x = "Transfusion (TRUE = Yes, FALSE = No)",
@@ -159,19 +163,19 @@ ggplot(data, aes(x = as.factor(Transfusion))) +
 
 #' Bar plot for Type of transplant
 ggplot(data, aes(x = Type)) +
-  geom_bar(fill = "steelblue", color = "black") +
+  geom_bar(fill = "lightblue", color = "black") +
   labs(title = "Distribution of Transplant Types", x = "Type", y = "Count") + 
   theme_minimal()
 
 #' Histogram of `Age`
 ggplot(data, aes(x = Age)) +
-  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  geom_histogram(binwidth = 5, fill = "lightblue", color = "black") +
   labs(title = "Age Distribution of Patients", x = "Age", y = "Frequency") + 
   theme_minimal()
 
 #' Relationship between BMI and ICU Length of Stay
 ggplot(data, aes(x = BMI, y = ICU_LOS)) +
-  geom_point(color = "steelblue") +
+  geom_point(color = "lightblue") +
   geom_smooth(method = "lm", color = "black") +
   labs(title = "BMI vs ICU Length of Stay", x = "BMI", y = "ICU Stay Duration (days)") + 
   theme_minimal()
@@ -179,25 +183,25 @@ ggplot(data, aes(x = BMI, y = ICU_LOS)) +
 #' Stacked bar chart for Gender by Type
 ggplot(data, aes(x = Gender, fill = Type)) +
   geom_bar(position = "fill") +
-  scale_fill_manual(values = c("steelblue", "#B0C4DE", "#D3D3D3")) +
+  scale_fill_manual(values = c("lightblue", "#B0C4DE", "#D3D3D3")) +
   labs(title = "Proportion of Transplant Types by Gender", x = "Gender", y = "Proportion") +
   theme_minimal()
 
 #' Boxplot of total RBC transfusion based on 30-day survival
 ggplot(data, aes(x = ALIVE_30DAYS_YN, y = Total_24hr_RBC)) +
-  geom_boxplot(fill = "steelblue", color = "black") +
+  geom_boxplot(fill = "lightblue", color = "black") +
   labs(title = "Total RBC Transfusion by 30-Day Survival", x = "Survived 30 Days (Y/N)", y = "Total RBC Units") + 
   theme_minimal()
 
 #histogram length of hospital stay 
 ggplot(data, aes(x = HOSPITAL_LOS)) +
-  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  geom_histogram(binwidth = 5, fill = "lightblue", color = "black") +
   labs(title = "Distribution of Hospital Stay Length", x = "Hospital Stay (days)", y = "Frequency") + 
   theme_minimal()
 
 #histogram of icu stay length
 ggplot(data, aes(x = ICU_LOS)) +
-  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  geom_histogram(binwidth = 5, fill = "lightblue", color = "black") +
   labs(title = "Distribution of ICU Stay Length", x = "ICU Stay (days)", y = "Frequency") + 
   theme_minimal()
 
@@ -328,14 +332,14 @@ print(high_corr_variables)
 
 #' Histogram for LAS_score
 ggplot(data, aes(x = LAS_score)) +
-  geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +
+  geom_histogram(binwidth = 1, fill = "lightblue", color = "black") +
   labs(title = "Distribution of LAS Score", x = "LAS Score", y = "Frequency") +
   theme_minimal()
 #' Right skewed - slightly normal
 
 #' Histogram for Pre_PTT
 ggplot(data, aes(x = Pre_PTT)) +
-  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  geom_histogram(binwidth = 5, fill = "lightblue", color = "black") +
   labs(title = "Distribution of Pre PTT", x = "Pre PTT", y = "Frequency") +
   theme_minimal()
 #' Right skewed
@@ -406,15 +410,11 @@ methods[] <- ""
 
 # Set methods for variables to impute
 methods["LAS_score"] <- "pmm"
-methods["Pre_PTT"] <- "pmm"
 
 # Predictors for LAS_score
 predictors_LAS <- c("Age", "Gender", "BMI", "COPD", "alpha1_Antitrypsin_Deficiency", 
                     "Cystic_Fibrosis", "Idiopathic_Pulmonary_Hypertension",
                     "Interstitial_Lung_Disease", "Pulm_Other", "Type")
-
-# Predictors for Pre_PTT
-predictors_PTT <- c("Pre_Hb", "Pre_Hct", "Pre_Platelets", "Pre_PT", "Pre_Creatinine")
 
 # Initialize predictor matrix with zeros
 pred_matrix <- make.predictorMatrix(data)
@@ -422,9 +422,6 @@ pred_matrix[,] <- 0  # Set all entries to 0
 
 # Set predictors for LAS_score
 pred_matrix["LAS_score", predictors_LAS] <- 1
-
-# Set predictors for Pre_PTT
-pred_matrix["Pre_PTT", predictors_PTT] <- 1
 
 # Perform single imputation
 imputed111 <- mice(
@@ -441,26 +438,17 @@ data_imputed <- complete(imputed111)
 
 # Update the original data
 data$LAS_score <- data_imputed$LAS_score
-data$Pre_PTT <- data_imputed$Pre_PTT
-
 
 
 #' The following plots are used to visualize the imputed 
 #' data. 
 xyplot(imputed111, LAS_score ~ Gender)
-xyplot(imputed111, Pre_PTT ~ Pre_Hct)
 
-#Diagnostic tests - dsitrbution of complete and imputed data needs to be similar
+#Diagnostic tests - distribution of complete and imputed data needs to be similar
 stripplot(imputed111, pch = c(21, 20), cex = c(1, 1.5))
 
 # Analysis 
 # Objective: Identify predictors that influence the need for transfusions 
-
-
-library(pROC)
-library(tree)
-library(knitr)
-library(kableExtra)
 
 #Assess and compares the performance of the methods (lasso classification vs. CART) using a fraction 
 #of the original data that was not used for training/tuning.
@@ -471,7 +459,6 @@ library(kableExtra)
 
 #Set the seed
 set.seed(111)
-
 
 #' Next we are going to identify the predictors that 
 #' we will be using in the Lasso classification model. 
@@ -1017,8 +1004,7 @@ summary(coxmodel)
 phtest <- cox.zph(coxmodel)
 print(phtest)
 
-#' In order to visualize, we opted to use the gt package, which is great for tables.
-library(gt)
+
 
 #' We are going to start by creating a results table, with all the things we 
 #' want to include, with the appropriate rounding.
@@ -1066,7 +1052,7 @@ hist(data$ICU_LOS,
      main = "Distribution of ICU Length of Stay",
      xlab = "ICU Length of Stay (days)",
      ylab = "Frequency",
-     col = "steelblue",
+     col = "lightblue",
      border = "black" , 
      xlim = c(1, 100))
 
@@ -1081,7 +1067,7 @@ boxplot(ICU_LOS ~ Transfusion, data = data,
         main = "ICU Length of Stay by Transfusion",
         xlab = "Transfusion",
         ylab = "ICU Length of Stay (days)",
-        col = c("steelblue", "tomato"),
+        col = c("lightblue", "tomato"),
         ylim = c(0, 25))
 
 
