@@ -309,9 +309,6 @@ library(tree)
 library(knitr)
 library(kableExtra)
 
-#Ensure "Transfusion" variable is factorized 
-model1data$Transfusion <- as.factor(model1data$Transfusion)
-
 #Assess and compares the performance of the methods (lasso classification vs. CART) using a fraction 
 #of the original data that was not used for training/tuning.
 #The best model (highest AUC score) will be used for further analysis.
@@ -335,6 +332,9 @@ x <- c(
 
 # Sub-setting the model data to include the predictors and "Transfusion" variable 
 model1data <- data[, c(x, "Transfusion")]
+
+#Ensure "Transfusion" variable is factorized 
+model1data$Transfusion <- as.factor(model1data$Transfusion)
 
 #Create an empty list to store the final predictors
 lasso_classi_predictor <- list()
@@ -380,7 +380,7 @@ for (i in 1:5) {
   
   #Create a legend
   legend(
-    "topright", legend = rownames(model1data$beta),
+    "topright", legend = rownames(lasso_model_classification$beta),
     col = colours,  
     lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
   )
