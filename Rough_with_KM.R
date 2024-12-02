@@ -15,6 +15,10 @@ library(glmnet)
 library(pastecs)
 library(tidyverse)
 library(kableExtra)
+library(gt)
+library(pROC)
+library(tree)
+library(knitr)
 
 #' Columns that were not highlighted were removed a priori
 #' on Excel. Since we are using Git, the same file should 
@@ -457,10 +461,7 @@ stripplot(imputed111, pch = c(21, 20), cex = c(1, 1.5))
 # Objective: Identify predictors that influence the need for transfusions 
 
 
-library(pROC)
-library(tree)
-library(knitr)
-library(kableExtra)
+
 
 #Assess and compares the performance of the methods (lasso classification vs. CART) using a fraction 
 #of the original data that was not used for training/tuning.
@@ -1017,8 +1018,7 @@ summary(coxmodel)
 phtest <- cox.zph(coxmodel)
 print(phtest)
 
-#' In order to visualize, we opted to use the gt package, which is great for tables.
-library(gt)
+
 
 #' We are going to start by creating a results table, with all the things we 
 #' want to include, with the appropriate rounding.
