@@ -359,7 +359,7 @@ high_corr_variables <- data.frame(
 
 print(high_corr_variables)
 
-#thus, we will choose to remove weight, hospital_los, Pre_Hct, Pre_Platelets, Pre_Fibrinogen and Pre_Creatinine from our analysis.
+#thus, we will choose to remove weight, hospital_los, Pre_Hb, Pre_Hct, Pre_Platelets, Pre_PT, Pre_PTT, Pre_Fibrinogen and Pre_Creatinine from our analysis.
 # We will use BMI, icu_los and Pre_INR
 
 #######################################
