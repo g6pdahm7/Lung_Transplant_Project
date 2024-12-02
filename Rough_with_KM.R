@@ -262,7 +262,7 @@ predictors_LAS <- c("Age", "Gender", "BMI", "COPD", "alpha1_Antitrypsin_Deficien
                     "Interstitial_Lung_Disease", "Pulm_Other", "Type")
 
 # Predictors for Pre_PTT
-predictors_PTT <- c("Pre_Hb", "Pre_Hct", "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_Creatinine")
+predictors_PTT <- c("Pre_Hb", "Pre_Hct", "Pre_Platelets", "Pre_PT", "Pre_Creatinine")
 
 # Initialize predictor matrix with zeros
 pred_matrix <- make.predictorMatrix(data)
@@ -301,22 +301,22 @@ xyplot(imputed111, Pre_PTT ~ Pre_Hct)
 #Diagnostic tests - dsitrbution of complete and imputed data needs to be similar
 stripplot(imputed111, pch = c(21, 20), cex = c(1, 1.5))
 
-#' Analysis 
-#' Question 1
+# Analysis 
+# Objective: Identify predictors that influence the need for transfusions 
 
 library(pROC)
 library(tree)
 library(knitr)
 library(kableExtra)
 
-#Need for transfusion 
-
-#TRANSFUSION
+#Ensure "Transfusion" variable is factorized 
+model1data$Transfusion <- as.factor(model1data$Transfusion)
 
 #Assess and compares the performance of the methods (lasso classification vs. CART) using a fraction 
 #of the original data that was not used for training/tuning.
 #The best model (highest AUC score) will be used for further analysis.
 
+#Let's check the performance of LASSO classification model
 #LASSO CLASSIFICATION 
 
 #Set the seed
@@ -324,16 +324,18 @@ set.seed(111)
 
 #' Next we are going to identify the predictors that 
 #' we will be using in the Lasso classification model. 
+
+#FIX: add new set of predictors 
 x <- c(
-  "Type", "Gender", "Height", "Weight", "Age", "BMI", "COPD",
+  "Type", "Gender", "Height", "Age", "BMI", "COPD",
   "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
   "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
   "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
-  "Preoperative_ECLS", "LAS_score", "Pre_Hb", "Pre_Hct",
-  "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_PTT", "Pre_Creatinine"
+  "Preoperative_ECLS", "LAS_score", "Pre_Hb",
+  "Pre_Platelets", "Pre_PT", "Pre_PTT", "Pre_Creatinine"
 )
 
-#' Subsetting the model data
+# Sub-setting the model data to include the predictors and "Transfusion" variable 
 model1data <- data[, c(x, "Transfusion")]
 
 #Create an empty list to store the final predictors
@@ -357,7 +359,7 @@ for (i in 1:5) {
   
   #The training and testing set will be a standard 80/20 training/testing split
   #80% of the data will be for training and 20% will be for testing
-  #Create a vector of row indices that corresponds to the trianing set
+  #Create a vector of row indices that corresponds to the training set
   #The for loop will create 5 unique training sets
   training <- sample(nrow(model1data), round(nrow(model1data) * 0.8))
   
@@ -370,7 +372,7 @@ for (i in 1:5) {
   #Train a model
   lasso_model_classification <- glmnet(x_classification, y_classification, family = "binomial")
   
-  # Plot Lasso plot
+  #Plot Lasso plot
   plot(
     lasso_model_classification, xvar = "lambda", label = TRUE, col = colours, 
     lwd = 1,
@@ -378,9 +380,9 @@ for (i in 1:5) {
     xlab = "log(Lambda)", ylab = "Coefficients"
   )
   
-  # Create a legend
+  #Create a legend
   legend(
-    "topright", legend = rownames(modelxx1$beta),
+    "topright", legend = rownames(model1data$beta),
     col = colours,  
     lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
   )
@@ -392,21 +394,21 @@ for (i in 1:5) {
   plot(cv_classification)
   title(paste("Cross-Validation Plot for Lasso Classifier of", i))
   
-  #1SE lambda that maximizes the AUC
-  se_lambda <- cv_classification$lambda.1se
+  #Optimal lambda that maximizes the AUC
+  optimal_lambda <- cv_classification$lambda.min
   
-  #Train a model using the 1SE lambda
-  lasso_model_classification_final <- glmnet(x_classification, y_classification, family = "binomial", lambda = se_lambda)
+  #Train a model using the optimal lambda
+  lasso_model_classification_final <- glmnet(x_classification, y_classification, family = "binomial", lambda = optimal_lambda)
   
-  #Look at the value of the features that stay in the model when using the 1SE lambda
-  coef_min_classification <- coef(cv_classification, s = "lambda.1se")
+  #Look at the value of the features that stay in the model when using the optimal lambda
+  coef_min_classification <- coef(cv_classification, s = "lambda.min")
   
   #List the selected predictors that stayed in the model
   lasso_classi_predictor[[i]] <- rownames(coef_min_classification)[coef_min_classification[, 1] != 0][-1]
   
   #Test the model on the testing data set and get the predicted probability 
   lasso_class_predict <- as.numeric(predict(lasso_model_classification_final, newx = model.matrix(Transfusion ~., model1data)[-training,-1], 
-                                            s = se_lambda, type = "response"))
+                                            s = optimal_lambda, type = "response"))
   
   #Generate the ROC curve for the testing data set 
   roc_class <- roc(model1data$Transfusion[-training], lasso_class_predict)
@@ -430,21 +432,22 @@ kable(
   kable_styling(bootstrap_options = c("striped", "condensed"), 
                 full_width = FALSE, position = "center") 
 
-# Check how common each predictors appears 
+#Check how common each predictors appears 
 
-# Flatten the list of predictors and count the frequency of each predictor
+#Flatten the list of predictors and count the frequency of each predictor
 predictor_list <- unlist(lasso_classi_predictor)
 predictor_freq <- table(predictor_list)
 
-# Sort the frequencies in descending order
+#Sort the frequencies in descending order
 predictor_freq_sorted <- sort(predictor_freq, decreasing = TRUE)
 
-# View the sorted frequency table
+#View the sorted frequency table
 predictor_freq_sorted
 
 #Convert the AUC values to a data frame (table)
 lasso_classi_auc_table <- data.frame(Iteration = 1:5, AUC = lasso_classi_auc)
 
+#Visualize table with kable
 kable(
   lasso_classi_auc_table, format = "html", digits = 2, 
   col.names = c("Iteration", "AUC"),
@@ -457,11 +460,8 @@ kable(
 #Calculate the average AUC
 lasso_classi_auc_average <- round(mean(lasso_classi_auc), digits = 3)
 
-
+#Let's check the performance of CART model (full and pruned tree)
 ###CART (full and pruned)
-
-model1data$Transfusion <- as.factor(model1data$Transfusion)
-
 #Create an empty list to store the variables from the CART model - full tree
 tree_classi_predictors <- list()
 
@@ -514,13 +514,13 @@ for (i in 1:5) {
   #Extract the predicted probability 
   pred_probs_prune_tree <- as.numeric(tree_prune_predict[,2])
   
-  #Generate the ROC curve for testing 
+  #Generate the ROC curve for testing - pruned tree
   roc_prune <-  roc(model1data$Transfusion[-training] ~ pred_probs_prune_tree)
   plot(roc_prune)
   title(paste("AUC-ROC Curve (Prune) of", i))
   prune_classi_auc[i] <- roc_prune$auc
   
-  #Let's do the same evaluation fro the original tree without pruning 
+  #Let's do the same evaluation for the original tree without pruning 
   #Extract the variables that were used in the tree model without pruning
   variable_tree <- unique(tree_model$frame$var[tree_model$frame$var != "<leaf>"])
   tree_classi_predictors[[i]] <- variable_tree
@@ -550,19 +550,17 @@ kable(
   kable_styling(bootstrap_options = c("striped", "condensed"), 
                 full_width = FALSE, position = "center") 
 
-# Check how common each predictors appears 
+#Check how common each predictors appears 
 
-# Convert the list of predictors from all iterations into a single vector
+#Flatten the list of predictors and count the frequency of each predictor
 all_tree_predictors <- unlist(tree_classi_predictors)
+tree_predictor_freq <- table(all_tree_predictors)
 
-# Count the frequency of each predictor
-predictor_counts <- table(all_tree_predictors)
+#Sort the frequencies in descending order
+tree_predictor_freq_sorted <- sort(tree_predictor_freq, decreasing = TRUE)
 
-# Sort the predictors from most to least frequent
-sorted_predictor_counts <- sort(predictor_counts, decreasing = TRUE)
-
-# Display the sorted frequency of predictors
-sorted_predictor_counts
+#Display the sorted frequency of predictors
+tree_predictor_freq_sorted
 
 #Convert the AUC values to a data frame (table) - full tree
 tree_auc_table <- data.frame(Iteration = 1:5, AUC = tree_classi_auc)
@@ -666,37 +664,26 @@ cv.lasso <- cv.glmnet(x, y, nfolds = 5, alpha = 1,family = "binomial", type.meas
 plot(cv.lasso)
 title("Log(lambda) vs. Coefficients for LASSO Classifier")
 
-#' 1SE lambda value that maximizes AUC 
-se_lambda <- cv.lasso$lambda.1se
-# AUC corresponding to 1SE lambda
-se_auc <- cv.lasso$cvm[cv.lasso$lambda == se_lambda]
+#' Optimal lambda value that maximizes AUC 
+optimal_lambda <- cv.lasso$lambda.min
+# AUC corresponding to optimal lambda
+optimal_auc <- cv.lasso$cvm[cv.lasso$lambda == optimal_lambda]
 
-#' Coefficients at 1SE lambda
-se_coefs <- coef(cv.lasso, s = "lambda.1se")
+#' Coefficients at optimal lambda
+optimal_coefs <- coef(cv.lasso, s = "lambda.min")
 
-#Extract non-zero coefficients and create a data frame
-se_coefs_table <- as.data.frame(as.matrix(se_coefs))
-se_coefs_table <- data.frame(
-  Predictor = rownames(se_coefs_table),
-  Coefficient = se_coefs_table[, 1]
-)
-#Remove row names
-rownames(se_coefs_table) <- NULL 
+#Extract non-zero coefficients that stayed in the mode when using optimal lambda
+optimal_lasso_predictors <- rownames(optimal_coefs)[optimal_coefs[, 1] != 0][-1]
 
-# Filter to display only non-zero coefficients
-se_coefs_table <- se_coefs_table[se_coefs_table$Coefficient != 0, ]
-
-###NOTE - maybe just do the predictors no coefficent since its not standardize 
+#Convert the predictors list to a data frame for better visualization (table)
+final_lasso_class_predictors_table <- data.frame(Predictors = optimal_lasso_predictors)
 kable(
-  se_coefs_table, format = "html", digits = 4,
-  col.names = c("Predictor", "Coefficient"),
-  caption = "Coefficients from Lasso Model"
+  final_lasso_class_predictors_table, format = "html", digits = 2, 
+  col.names = c("Predictors"),
+  caption = "Lasso Classifiers - Final Selected Predictors"
 ) %>%
-  kable_styling(
-    bootstrap_options = c("striped", "condensed"),
-    full_width = FALSE,
-    position = "center"
-  )
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
 
 ################### Model 2: Continuous outcome.
 #' Identical process to the one used above, just  
@@ -712,12 +699,12 @@ set.seed(123)
 
 # Define predictors and outcome with updated variable names
 predictors22 <- c(
-  "Type", "Gender", "Height", "Weight", "Age", "BMI", "COPD",
+  "Type", "Gender", "Height", "Age", "BMI", "COPD",
   "alpha1_Antitrypsin_Deficiency", "Cystic_Fibrosis",
   "Idiopathic_Pulmonary_Hypertension", "Interstitial_Lung_Disease",
   "Pulm_Other", "Redo_Lung_Transplant", "ExVIVO_Lung_Perfusion",
-  "Preoperative_ECLS", "LAS_score", "Pre_Hb", "Pre_Hct",
-  "Pre_Platelets", "Pre_PT", "Pre_INR", "Pre_PTT", "Pre_Creatinine"
+  "Preoperative_ECLS", "LAS_score", "Pre_Hb",
+  "Pre_Platelets", "Pre_PT", "Pre_PTT", "Pre_Creatinine"
 )
 
 # Subset data for the new model
@@ -727,10 +714,10 @@ model22data <- data[, c(predictors22, "Total_24hr_RBC")]
 x22 <- model.matrix(Total_24hr_RBC ~ ., data = model22data)[, -1]
 y22 <- model22data$Total_24hr_RBC
 
-# Train Lasso model
+#Train Lasso model
 lasso_model22 <- glmnet(x22, y22, family = "gaussian")
 
-# Plot coefficients vs log(lambda)
+#Plot coefficients vs log(lambda) - Lasso Path
 plot(
   lasso_model22, xvar = "lambda", label = TRUE, col = colours, 
   lwd = 1,
@@ -738,55 +725,41 @@ plot(
   xlab = "log(Lambda)", ylab = "Coefficients"
 )
 
-# Create a legend
+#Create a legend
 legend(
   "bottomright", legend = rownames(lasso_model22$beta),
   col = colours,  
   lty = 1, lwd = 1, cex = 0.6, ncol = 2, title = "Predictors"
 )
 
-# Cross-validation to find 1SE lambda
+#Cross-validation to find optimal lambda
 set.seed(123)
 cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian")
 
-# Plot cross-validation curve
+#Plot cross-validation curve
 plot(cv_lasso22)
+#title(main = "Cross-Validation Plot for Lasso Classifier")
 
-# Extract 1SE lambda
-se_lambda22 <- cv_lasso22$lambda.1se
-print(paste("1SE lambda:", se_lambda22))
+#Extract optimal lambda
+optimal_lambda22 <- cv_lasso22$lambda.min
+print(paste("optimal lambda:", optimal_lambda22))
 
-# Coefficients at 1SE lambda
-se_coefs22 <- coef(cv_lasso22, s = "lambda.1se")
+#Coefficients at optimal lambda
+optimal_coefs22 <- coef(cv_lasso22, s = "lambda.min")
 
-#Extract non-zero coefficients and create a data frame
-se_coefs22_table <- as.data.frame(as.matrix(se_coefs22))
-se_coefs22_table <- data.frame(
-  Predictor = rownames(se_coefs22_table),
-  Coefficient = se_coefs22_table[, 1]
-)
+#Extract non-zero coefficients that stayed in the mode when using optimal lambda
+optimal_reg_predictors <- rownames(optimal_coefs22)[optimal_coefs22[, 1] != 0][-1]
 
-# Remove row names
-rownames(se_coefs22_table) <- NULL  
-
-# Filter to display only non-zero coefficients
-se_coefs22_table <- se_coefs22_table[se_coefs22_table$Coefficient != 0, ]
+#Convert the predictors list to a data frame for better visualization (table)
+lasso_reg_predictors_table <- data.frame(Predictors = optimal_reg_predictors)
 
 kable(
-  se_coefs22_table, format = "html", digits = 4,
-  col.names = c("Predictor", "Coefficient"),
-  caption = "se Coefficients from Second Lasso Model"
+  lasso_reg_predictors_table, format = "html", digits = 2, 
+  col.names = c("Predictors"),
+  caption = "Lasso Regression - Final Selected Predictors"
 ) %>%
-  kable_styling(
-    bootstrap_options = c("striped", "condensed"),
-    full_width = FALSE,
-    position = "center"
-  )
-
-###
-### Be ready to answer the question: 
-### Why Lasso, why not tree, why not logistic/linear regression?
-###
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
 
 ######################### q2 baby
 
