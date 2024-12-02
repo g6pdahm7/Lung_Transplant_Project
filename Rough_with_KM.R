@@ -913,21 +913,19 @@ kable(
   kable_styling(bootstrap_options = c("striped", "condensed"), 
                 full_width = FALSE, position = "center") 
 
-######################### q2 baby
+######################### Q2
 
-# Ensure date columns are in Date format
+#################################################################### Setting up Survival time
+
+#' The first thing we will do is ensure all the date columns
+#' are in the correct format
+
 data$OR_Date <- as.Date(data$OR_Date)
-
 data$DEATH_DATE <- as.Date(data$DEATH_DATE, format = "%d-%b-%Y")
 
-###
-### Is it safe to assume that the last day of follow up is the last recorded date of death?
-### Some patients have date of death recorded after their 12 month follow up.
-###
-
-# Define a cutoff date for censoring (e.g., date of last follow-up)
-# Here, we'll use the latest date available in the dataset or a specified date
-last_follow_up_date <- as.Date("2020-01-22")  # This date here is the latest one available.
+#' Next we will use the last death date as the last date of follow
+#' up. See the results section in the report for more elaboration.
+last_follow_up_date <- as.Date("2020-01-22")
 
 #' We will now calculate Survival_Time.
 #' If the patient's date of death is set, then their survival
@@ -947,86 +945,25 @@ data <- data %>%
     status = ifelse(!is.na(DEATH_DATE), 1, 0)
   )
 
-# Ensure Survival_Time is non-negative
+#' This step is just to make sure there are no 
+#' negative values.
 data$Survival_Time <- pmax(data$Survival_Time, 0)
 
-# Check the data
-head(data[, c("OR_Date", "DEATH_DATE", "Survival_Time", "status")])
-
-
-########## KM for Massive_Transfusion!!!
-# Convert Massive_Transfusion to factor if not already
-data$Massive_Transfusion <- as.factor(data$Massive_Transfusion)
-
-# Fit KM model
-km_fit_mt <- survfit(Surv(Survival_Time, status) ~ Massive_Transfusion, data = data)
-
-# Kaplan-Meier and Log-Rank Test for Massive Transfusion
-plot(km_fit_mt, xlab = "Time (days)", ylab = "Survival Probability",
-     col = 1:2, lwd = 2, main = "Kaplan-Meier Survival Curves by Massive Transfusion")
-legend("bottom", legend = levels(data$Massive_Transfusion), col = 1:2, lwd = 2)
-
-
-# Plot KM curves
-ggsurvplot(
-  km_fit_mt,
-  data = data,
-  conf.int = TRUE,
-  pval = TRUE,
-  risk.table = TRUE,
-  title = "Survival by Massive Transfusion",
-  xlab = "Time (days)",
-  ylab = "Survival Probability",
-  legend.title = "Massive Transfusion"
-)
-
-# Log-rank test for Massive Transfusion
-log_rank_massive <- survdiff(Surv(Survival_Time, status) ~ Massive_Transfusion, data = data)
-print(log_rank_massive)
-
-########### KM for ECLS_TYPE
-# Ensure ECLS_Type is a factor
-data$ECLS_Type <- as.factor(data$ECLS_Type)
-
-# Fit KM model
-km_fit_ecls <- survfit(Surv(Survival_Time, status) ~ ECLS_Type, data = data)
-
-# Kaplan-Meier and Log-Rank Test for ECLS Type
-plot(km_fit_ecls, xlab = "Time (days)", ylab = "Survival Probability",
-     col = 1:3, lwd = 2, main = "Kaplan-Meier Survival Curves by ECLS Type")
-legend("bottom", legend = levels(data$ECLS_Type), col = 1:3, lwd = 2)
-
-
-# Plot KM curves
-ggsurvplot(
-  km_fit_ecls,
-  data = data,
-  conf.int = TRUE,
-  pval = TRUE,
-  risk.table = TRUE,
-  title = "Survival by ECLS Type",
-  xlab = "Time (days)",
-  ylab = "Survival Probability",
-  legend.title = "ECLS Type"
-)
-
-# Log-rank test for ECLS Type
-log_rank_ecls <- survdiff(Surv(Survival_Time, status) ~ ECLS_Type, data = data)
-print(log_rank_ecls)
-
-######### KM for Transfusion 
-# Ensure Transfusion is a factor
+######################################################################### KM for Transfusion 
+#' Setting the data in the correct type
 data$Transfusion <- as.factor(data$Transfusion)
 
-# Fit KM model
+#' Fitting the KM model and viewing its summary
 km_fit_transfusion <- survfit(Surv(Survival_Time, status) ~ Transfusion, data = data)
+summary(km_fit_transfusion)
 
-# Kaplan-Meier and Log-Rank Test for Transfusion
+# Plotting the KM curve in a similar way to the tutorials
 plot(km_fit_transfusion, xlab = "Time (days)", ylab = "Survival Probability",
      col = 1:2, lwd = 2, main = "Kaplan-Meier Survival Curves by Transfusion")
 legend("bottom", legend = levels(data$Transfusion), col = 1:2, lwd = 2)
 
-# Plot KM curves
+#' Using a new function that was found in order to provide a more
+#' elaborate graph with the n.risk table.
 ggsurvplot(
   km_fit_transfusion,
   data = data,
@@ -1036,49 +973,115 @@ ggsurvplot(
   title = "Survival by Transfusion",
   xlab = "Time (days)",
   ylab = "Survival Probability",
-  legend.title = "Transfusion"
+  legend.title = "Transfusion",
+  ggtheme = theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),  
+    axis.title = element_text(face = "bold"),              
+    axis.text = element_text(face = "bold")                
+  ),
 )
 
-# Log-rank test for Transfusion
+#' Now we are going to do the log rank test
 log_rank_transfusion <- survdiff(Surv(Survival_Time, status) ~ Transfusion, data = data)
 print(log_rank_transfusion)
 
-
-
-############ Cox PH Model
-# Define the predictors to be used in the model
-predictors_cox <- c(
-   "ICU_LOS", "BMI", "Age", "Preoperative_ECLS", "LAS_score",
-    "Massive_Transfusion", "COPD", "Total_24hr_RBC"
+#' Next, I want to view the distribution of time points at which patients were deceased.
+event.survival <- data %>% filter(status == 1) %>% pull(Survival_Time)
+hist(
+  event.survival,
+  breaks = 20,  # Adjust number of bins as needed
+  main = "Histogram of Survival Times (Days) for Deceased Patients",
+  xlab = "Survival Time (Days)",
+  ylab = "Frequency",
+  col = "lightblue",
+  border = "black"
 )
 
+######################################################################## Cox PH Model
+#' We will start by definiting the predictors. 
+#' We will use transfusion, in addition to all the significant predictors from the earlier
+#' Lasso classification model.
 predictors_cox <- c(
-  "Type", "COPD", "Total_24hr_RBC"
+   "Type", "Height", "BMI", "Interstitial_Lung_Disease", "COPD", "Pulm_Other",
+   "Transfusion", "Preoperative_ECLS", "LAS_score", 
+   "Pre_INR"
 )
 
-# Create the formula for the Cox model
+#' Creating the Cox Proportion Hazards model. We will continue to censor for survival time
+#' using the same assumption.
 coxf <- as.formula(paste("Surv(Survival_Time, status) ~", paste(predictors_cox, collapse = " + ")))
-
-# Fit the Cox Proportional Hazards model
 coxmodel <- coxph(coxf, data = data)
-
-# Print the summary of the model
 summary(coxmodel)
 
-# Check proportional hazards assumptions
+#' Checking assumptions
 phtest <- cox.zph(coxmodel)
 print(phtest)
 
-### WilcoxTest to test if there is a significant difference ###
-wilcox.icu <- wilcox.test(ICU_LOS ~ Transfusion, data = test)
+#' In order to visualize, we opted to use the gt package, which is great for tables.
+library(gt)
+
+#' We are going to start by creating a results table, with all the things we 
+#' want to include, with the appropriate rounding.
+cox_summary <- summary(coxmodel)
+result_table <- data.frame(
+  Variable = rownames(cox_summary$coefficients),
+  Hazard_Ratio = round(cox_summary$coefficients[, "exp(coef)"], 2),
+  CI = paste0("(", 
+              round(cox_summary$conf.int[, "lower .95"], 2), 
+              ", ", 
+              round(cox_summary$conf.int[, "upper .95"], 2), 
+              ")"),
+  P_Value = round(cox_summary$coefficients[, "Pr(>|z|)"], 3) # Rounded to 3 decimals
+)
+
+#' Creating the table
+gt_table <- result_table %>%
+  gt() %>%
+  tab_header(
+    title = md("**Cox Proportional Hazards Model Results**"),
+    subtitle = md("**Hazard Ratios, 95% CI, and P-Values**")
+  ) %>%
+  fmt_number(
+    columns = c(Hazard_Ratio),
+    decimals = 2
+  ) %>%
+  fmt_number(
+    columns = P_Value,
+    decimals = 3
+  ) %>%
+  cols_label(
+    Variable = md("**Predictor**"),
+    Hazard_Ratio = md("**Hazard Ratio**"),
+    CI = md("**95% CI**"),
+    P_Value = md("**P-Value**")
+  )
+gt_table
+
+####################################################### Wilcoxon
+
+#' The histogram below shows that ICU lengths of stay are heavily right skewed.
+#' A non-parametric hypothesis test required.
+hist(data$ICU_LOS,
+     breaks = 300,
+     main = "Distribution of ICU Length of Stay",
+     xlab = "ICU Length of Stay (days)",
+     ylab = "Frequency",
+     col = "steelblue",
+     border = "black" , 
+     xlim = c(1, 100))
+
+#' Wilcoxon test conducted to see if there is a significant difference between 
+#' those with and without transfusions.
+wilcox.icu <- wilcox.test(ICU_LOS ~ Transfusion, data = data)
 icu.p <- wilcox.icu$p.value
+wilcox.icu
 
-wilcox.hos <- wilcox.test(HOSPITAL_LOS ~ Transfusion, data = test)
-hos.p <- wilcox.hos$p.value
+#' Boxplot created to visualize.
+boxplot(ICU_LOS ~ Transfusion, data = data,
+        main = "ICU Length of Stay by Transfusion",
+        xlab = "Transfusion",
+        ylab = "ICU Length of Stay (days)",
+        col = c("steelblue", "tomato"),
+        ylim = c(0, 25))
 
-wilcox.icu.massive <- wilcox.test(ICU_LOS ~ Massive_Transfusion, data = test)
-icu.p.massive <- wilcox.icu.massive$p.value
-
-wilcox.hos.massive <- wilcox.test(HOSPITAL_LOS ~ Massive_Transfusion, data = test)
-hos.p.massive <- wilcox.hos.massive$p.value
 
