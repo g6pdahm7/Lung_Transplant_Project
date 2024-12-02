@@ -12,6 +12,9 @@ library(funModeling)
 library(corrplot)
 library(mice)
 library(glmnet)
+library(pastecs)
+library(tidyverse)
+library(kableExtra)
 
 #' Columns that were not highlighted were removed a priori
 #' on Excel. Since we are using Git, the same file should 
@@ -78,6 +81,9 @@ data$Gender <- ifelse(data$Gender == "TRUE", "Male", "Female")
 #' Some initial thoughts: 
 #' Pre_Fibrinogen will have to be excluded due to 
 #' missingness greater than 30%.
+#' 
+####################
+### Cleaning/EDA ###
 
 #' Next, we will perform a simple EDA prior to 
 #' handling the any missingness.
@@ -86,6 +92,60 @@ data$Gender <- ifelse(data$Gender == "TRUE", "Male", "Female")
 #' that states whether or not someone had a transplant.
 data <- data %>%
   mutate(Transfusion = ifelse(Total_24hr_RBC > 0, TRUE, FALSE))
+
+#' Summary table of numeric variables
+desc.data <- stat.desc(dplyr::select_if(data, is.numeric))
+
+desc.data <- desc.data[-c(1,2,3,7,10,11),-c(1,39)] #remove rows and cols with irrelevant descriptive stats
+
+# Render table
+kable(t(desc.data), format = "html", digits = 2, 
+      caption = "Summary of Numeric Variables in Lung Transplant Patients Dataset") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+#' Summary table of categorical data
+#subset categorical variables
+data$Massive_Transfusion <- as.factor(data$Massive_Transfusion)
+character.data <- data %>% select_if(negate(is.numeric))
+character.data <- character.data[,-c(1,17)] #remove OR date, death date
+
+character.data <- character.data %>%
+  mutate(across(everything(), as.character)) #ensure all cols are characters
+
+# Function to summarize categorical variables
+summarize_character_data_combined <- function(df) {
+  # Summarize each column
+  summary_list <- lapply(names(df), function(var) {
+    df %>%
+      count(!!sym(var), name = "Count") %>%
+      mutate(
+        Variable = var,
+        Proportion = round((Count / sum(Count)) * 100, 2)
+      ) %>%
+      rename(Category = !!sym(var)) %>%
+      select(Variable, Category, Count, Proportion)
+  })
+  
+  # Combine all summaries into one dataframe
+  summary_df <- bind_rows(summary_list)
+  
+  # Combine Variable and Category into a single column
+  summary_df <- summary_df %>%
+    mutate(Combined = paste(Variable, Category, sep = " - ")) %>%
+    select(Combined, Count, Proportion)
+  
+  return(summary_df)
+}
+
+summary_table <- summarize_character_data_combined(character.data)
+
+#table of Categorical data
+kable(summary_table, format = "html", caption = "Summary of Categorical Variables", 
+      col.names = c("Variable", "Count","Proportion (%)")) %>%
+      kable_styling(bootstrap_options = "condensed") %>%
+      row_spec(c(1:3, 6:7, 10:11, 14:15, 18:19, 22:23, 26:27, 32:37, 40:41), background = "#f2f2f2") 
+
 
 #' Bar plot for the number of people with and without transfusions
 ggplot(data, aes(x = as.factor(Transfusion))) +
@@ -129,8 +189,89 @@ ggplot(data, aes(x = ALIVE_30DAYS_YN, y = Total_24hr_RBC)) +
   labs(title = "Total RBC Transfusion by 30-Day Survival", x = "Survived 30 Days (Y/N)", y = "Total RBC Units") + 
   theme_minimal()
 
-#' Next, I want to create a simple correlation plot of some of 
-#' the patient characteristics, and some of the general outcomes:
+#histogram length of hospital stay 
+ggplot(data, aes(x = HOSPITAL_LOS)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of Hospital Stay Length", x = "Hospital Stay (days)", y = "Frequency") + 
+  theme_minimal()
+
+#histogram of icu stay length
+ggplot(data, aes(x = ICU_LOS)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "black") +
+  labs(title = "Distribution of ICU Stay Length", x = "ICU Stay (days)", y = "Frequency") + 
+  theme_minimal()
+
+######################################################
+### Exploring Transfusions/Massive Transfusion Pts ###
+
+#subset data for transfusion and massive transfusion
+data.transfusion <- data %>%
+  filter(Transfusion == "TRUE") 
+data.transfusion$Transfusion <- as.factor(data.transfusion$Transfusion)
+
+data.massive <- data %>%
+  filter(Massive_Transfusion == 1)
+data.massive$Massive_Transfusion <- as.factor(data.massive$Massive_Transfusion)
+data.massive$Transfusion <- as.factor(data.massive$Transfusion)
+
+#' Summary table of numeric variables for pts with transfusions
+desc.transfusion <- stat.desc(dplyr::select_if(data.transfusion, is.numeric))
+
+desc.transfusion <- desc.transfusion[-c(1,2,3,7,10,11),-c(1)] #remove rows and cols with irrelevant descriptive stats
+
+# Render table
+kable(t(desc.transfusion), format = "html", digits = 2, 
+      caption = "Summary of Numeric Data in Lung Transplant Patients who received Transfusion") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), 
+                full_width = FALSE, position = "center") 
+
+
+#Summarize categorical transfusion data
+char.transfusion <- data.transfusion[, !sapply(data.transfusion, is.numeric), drop = FALSE]
+char.transfusion <- char.transfusion[,-c(1,17,22)] #remove OR date, death date, transfusion status
+char.transfusion <- char.transfusion %>%
+  mutate(across(everything(), as.character)) #ensure all cols are characters
+
+#summarize columns
+summarize_transfusion_data_combined <- function(df) {
+  # Summarize each column
+  summary_list <- lapply(names(df), function(var) {
+    df %>%
+      count(!!sym(var), name = "Count") %>%
+      mutate(
+        Variable = var,
+        Proportion = round((Count / sum(Count)) * 100, 2)
+      ) %>%
+      rename(Category = !!sym(var)) %>%
+      select(Variable, Category, Count, Proportion)
+  })
+  
+  # Combine all summaries into one dataframe
+  summary_df <- bind_rows(summary_list)
+  
+  # Combine Variable and Category into a single column
+  summary_df <- summary_df %>%
+    mutate(Combined = paste(Variable, Category, sep = " - ")) %>%
+    select(Combined, Count, Proportion)
+  
+  return(summary_df)
+}
+
+transfusion_summary_table <- summarize_transfusion_data_combined(char.transfusion)
+
+#Table of transfusion pt characterisitcs
+kable(transfusion_summary_table, format = "html", caption = "Characterisitcs of Patients with Transfusions (Categorical Variables)", 
+      col.names = c("Variable", "Count","Proportion (%)")) %>%
+  kable_styling(bootstrap_options = "condensed") %>%
+  row_spec(c(1:3, 6:7, 10:11, 14:15, 18:19, 22:23, 26:27, 32:37), background = "#f2f2f2") #highlight to group variables
+
+
+
+#######################################
+### Testing collinearity of variables ## 
+
+#' Next, I want to create a simple correlation plot to view if 
+#' variables are correlated with each other
 
 #' Create a new data set to view correction
 correlation_data <- data
@@ -143,13 +284,14 @@ correlation_data$ALIVE_30DAYS_YN <- as.numeric(data$ALIVE_30DAYS_YN == "Y")
 correlation_data$ALIVE_90DAYS_YN <- as.numeric(data$ALIVE_90DAYS_YN == "Y")  
 correlation_data$ALIVE_12MTHS_YN <- as.numeric(data$ALIVE_12MTHS_YN == "Y") 
 
-
 #' Define groups of variables
 group1 <- correlation_data %>%
-  select(Age, Gender, Weight, Height, BMI, Type)
+  select(Age, Gender, Weight, Height, BMI, Type,Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN,
+         Pre_Hb, Pre_Hct, Pre_Platelets, Pre_PT, Pre_INR, Pre_PTT, Pre_Fibrinogen, Pre_Creatinine)
 
 group2 <- correlation_data %>%
-  select(Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN)
+  select(Age, Gender, Weight, Height, BMI, Type,Transfusion, ICU_LOS, HOSPITAL_LOS, ALIVE_30DAYS_YN, ALIVE_90DAYS_YN, ALIVE_12MTHS_YN,
+         Pre_Hb, Pre_Hct, Pre_Platelets, Pre_PT, Pre_INR, Pre_PTT, Pre_Fibrinogen, Pre_Creatinine)
 
 #' Compute correlation matrix between group1 and group2
 cor_matrix <- cor(group1, group2, use = "pairwise.complete.obs")
@@ -157,9 +299,29 @@ cor_matrix <- cor(group1, group2, use = "pairwise.complete.obs")
 #' Plot the correlation heatmap
 corrplot(cor_matrix, method = "color", is.corr = TRUE, 
          tl.cex = 0.8, number.cex = 0.7,
-         title = "Correlation Plot Between Predictors and Outcomes",
+         title = "Correlation of Predcitors ",
          mar = c(0, 0, 1, 0))
 
+# Define the threshold for high correlation 
+threshold <- 0.7
+
+# Find variable pairs with absolute correlation above the threshold
+high_corr_pairs <- which(abs(cor_matrix) > threshold & lower.tri(cor_matrix), arr.ind = TRUE)
+
+# Display the variable names and their correlation values
+high_corr_variables <- data.frame(
+  Variable1 = rownames(cor_matrix)[high_corr_pairs[, 1]],
+  Variable2 = colnames(cor_matrix)[high_corr_pairs[, 2]],
+  Correlation = cor_matrix[high_corr_pairs]
+)
+
+print(high_corr_variables)
+
+#thus, we will choose to remove weight, hospital_los, Pre_Hct, Pre_Platelets, Pre_Fibrinogen and Pre_Creatinine from our analysis.
+# We will use BMI, icu_los and Pre_INR
+
+#######################################
+#' Additional cleaning and Imputation #
 
 #' We will now create histograms for the two columns we will impute.
 #' This will help inform the imputation method we will use.
@@ -177,14 +339,6 @@ ggplot(data, aes(x = Pre_PTT)) +
   labs(title = "Distribution of Pre PTT", x = "Pre PTT", y = "Frequency") +
   theme_minimal()
 #' Right skewed
-
-
-###
-### Tailor EDA to answer first part of first question
-### Characteristics of patients that require transfusions.
-###
-
-#' Additional cleaning and Imputation
 
 #' We will start by removing an unnecessary column that is 
 #' redundant with another column for icu stay.
@@ -239,9 +393,7 @@ data <- data %>% select(-ECLS_CPB)
 data <- data %>% mutate_if(is.character, as.factor)
 colnames(data) <- gsub("[#-]", "_", colnames(data))
 
-#' Imputation
-
-
+#' Imputation ##
 #' Converting character variables to factors
 data <- data %>% mutate_if(is.character, as.factor)
 
@@ -304,6 +456,7 @@ stripplot(imputed111, pch = c(21, 20), cex = c(1, 1.5))
 # Analysis 
 # Objective: Identify predictors that influence the need for transfusions 
 
+
 library(pROC)
 library(tree)
 library(knitr)
@@ -318,6 +471,7 @@ library(kableExtra)
 
 #Set the seed
 set.seed(111)
+
 
 #' Next we are going to identify the predictors that 
 #' we will be using in the Lasso classification model. 
@@ -914,4 +1068,17 @@ summary(coxmodel)
 # Check proportional hazards assumptions
 phtest <- cox.zph(coxmodel)
 print(phtest)
+
+### WilcoxTest to test if there is a significant difference ###
+wilcox.icu <- wilcox.test(ICU_LOS ~ Transfusion, data = test)
+icu.p <- wilcox.icu$p.value
+
+wilcox.hos <- wilcox.test(HOSPITAL_LOS ~ Transfusion, data = test)
+hos.p <- wilcox.hos$p.value
+
+wilcox.icu.massive <- wilcox.test(ICU_LOS ~ Massive_Transfusion, data = test)
+icu.p.massive <- wilcox.icu.massive$p.value
+
+wilcox.hos.massive <- wilcox.test(HOSPITAL_LOS ~ Massive_Transfusion, data = test)
+hos.p.massive <- wilcox.hos.massive$p.value
 
