@@ -669,6 +669,7 @@ hist(data$ICU_LOS,
 #' those with and without transfusions.
 wilcox.icu <- wilcox.test(ICU_LOS ~ Transfusion, data = data)
 icu.p <- wilcox.icu$p.value
+wilcox.icu
 
 #' Boxplot created to visualize.
 boxplot(ICU_LOS ~ Transfusion, data = data,
