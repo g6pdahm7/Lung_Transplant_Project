@@ -1012,7 +1012,7 @@ cv_lasso22 <- cv.glmnet(x22, y22, family = "gaussian")
 
 #Plot cross-validation curve
 plot(cv_lasso22)
-#title(main = "Cross-Validation Plot for Lasso Classifier")
+title(main = "Cross-Validation Plot for Lasso Regression")
 
 #Extract optimal lambda
 optimal_lambda22 <- cv_lasso22$lambda.min
@@ -1027,14 +1027,23 @@ optimal_reg_predictors <- rownames(optimal_coefs22)[optimal_coefs22[, 1] != 0][-
 #Convert the predictors list to a data frame for better visualization (table)
 lasso_reg_predictors_table <- data.frame(Predictors = optimal_reg_predictors)
 
-kable(
-  lasso_reg_predictors_table, format = "html", digits = 2, 
-  col.names = c("Predictors"),
-  caption = "Lasso Regression - Final Selected Predictors"
-) %>%
-  kable_styling(bootstrap_options = c("striped", "condensed"), 
-                full_width = FALSE, position = "center") 
-
+# Create table using gt package
+lasso_reg_predictors_table %>%
+  gt() %>%
+  tab_header(
+    title = "Lasso Regression - Final Selected Predictors"
+  ) %>%
+  cols_label(
+    Predictors = "Predictors"
+  ) %>%
+  tab_options(
+    table.width = pct(100),  # Adjust table width as needed
+    table.font.size = "small"
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(columns = everything())
+  )
 ######################### Q2
 
 #################################################################### Setting up Survival time
