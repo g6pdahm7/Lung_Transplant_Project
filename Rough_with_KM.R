@@ -563,13 +563,25 @@ for (i in 1:5) {
 
 #Convert the predictors list to a data frame for better visualization (table)
 lasso_class_predictors_table <- data.frame(Iteration = 1:5, Predictors = sapply(lasso_classi_predictor, toString))
-kable(
-  lasso_class_predictors_table, format = "html", digits = 2, 
-  col.names = c("Iteration", "Predictors"),
-  caption = "Lasso Classifiers - Selected Predictors for Each Iteration"
-) %>%
-  kable_styling(bootstrap_options = c("striped", "condensed"), 
-                full_width = FALSE, position = "center") 
+
+# Create the table with gt
+lasso_class_predictors_table %>%
+  gt() %>%
+  tab_header(
+    title = "Lasso Classifiers - Selected Predictors for Each Iteration"
+  ) %>%
+  cols_label(
+    Iteration = "Iteration",
+    Predictors = "Predictors"
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(75)
+  )
 
 #Check how common each predictors appears 
 
@@ -586,15 +598,29 @@ predictor_freq_sorted
 #Convert the AUC values to a data frame (table)
 lasso_classi_auc_table <- data.frame(Iteration = 1:5, AUC = lasso_classi_auc)
 
-#Visualize table with kable
-kable(
-  lasso_classi_auc_table, format = "html", digits = 2, 
-  col.names = c("Iteration", "AUC"),
-  caption = "Lasso Classifiers - AUC for Each Iteration"
-) %>%
-  kable_styling(
-    bootstrap_options = c("striped", "condensed"),
-    full_width = FALSE, position = "center")
+# Create the table with gt
+lasso_classi_auc_table %>%
+  gt() %>%
+  tab_header(
+    title = "Lasso Classifiers - AUC for Each Iteration"
+  ) %>%
+  cols_label(
+    Iteration = "Iteration",
+    AUC = "AUC"
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) %>%
+  fmt_number(
+    columns = c(AUC),
+    decimals = 2
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(50)
+  )
+
 
 #Calculate the average AUC
 lasso_classi_auc_average <- round(mean(lasso_classi_auc), digits = 3)
@@ -681,13 +707,24 @@ for (i in 1:5) {
 #Convert the predictors list to a data frame for better visualization (table) - full tree
 tree_classi_predictors_table <- data.frame(Iteration = 1:5, Variables = sapply(tree_classi_predictors, toString))
 
-kable(
-  tree_classi_predictors_table, format = "html", digits = 2, 
-  col.names = c("Iteration", "Predictors"),
-  caption = "CART Tree - Selected Predictors for Each Iteration"
-) %>%
-  kable_styling(bootstrap_options = c("striped", "condensed"), 
-                full_width = FALSE, position = "center") 
+# Create the table with gt
+tree_classi_predictors_table %>%
+  gt() %>%
+  tab_header(
+    title = "CART Tree - Selected Predictors for Each Iteration"
+  ) %>%
+  cols_label(
+    Iteration = "Iteration",
+    Variables = "Predictors"
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(75)
+  )
 
 #Check how common each predictors appears 
 
@@ -704,15 +741,28 @@ tree_predictor_freq_sorted
 #Convert the AUC values to a data frame (table) - full tree
 tree_auc_table <- data.frame(Iteration = 1:5, AUC = tree_classi_auc)
 
-kable(
-  tree_auc_table, format = "html", digits = 2, 
-  col.names = c("Iteration", "AUC"),
-  caption = "CART Tree - AUC for Each Iteration"
-) %>%
-  kable_styling(
-    bootstrap_options = c("striped", "condensed"),
-    full_width = FALSE, position = "center")
-
+# Create the table with gt
+tree_auc_table %>%
+  gt() %>%
+  tab_header(
+    title = "CART Tree - AUC for Each Iteration"
+  ) %>%
+  cols_label(
+    Iteration = "Iteration",
+    AUC = "AUC"
+  ) %>%
+  fmt_number(
+    columns = AUC,
+    decimals = 2
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(75)
+  )
 
 #Calculate the average AUC - full tree 
 tree_auc_average <- round(mean(tree_classi_auc), digits = 3)
@@ -720,13 +770,24 @@ tree_auc_average <- round(mean(tree_classi_auc), digits = 3)
 #Convert the predictors list to a data frame for better visualization (table) - prune tree
 prune_predictors_table <- data.frame(Iteration = 1:5, Variables = sapply(prune_classi_predictors, toString))
 
-kable(
-  prune_predictors_table, format = "html", digits = 2, 
-  col.names = c("Iteration", "Predictors"),
-  caption = "CART Pruned Tree - Selected Predictors for Each Iteration"
-) %>%
-  kable_styling(bootstrap_options = c("striped", "condensed"), 
-                full_width = FALSE, position = "center")
+# Create the table with gt
+prune_predictors_table %>%
+  gt() %>%
+  tab_header(
+    title = "CART Pruned Tree - Selected Predictors for Each Iteration"
+  ) %>%
+  cols_label(
+    Iteration = "Iteration",
+    Variables = "Predictors"
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(75)
+  )
 
 #Convert the AUC values to a data frame (table) - prune tree
 prune_auc_table <- data.frame(Iteration = 1:5, AUC = prune_classi_auc)
