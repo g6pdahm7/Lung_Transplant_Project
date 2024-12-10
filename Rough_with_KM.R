@@ -206,8 +206,8 @@ ggplot(data, aes(x = Type)) +
   theme_minimal()
 
 #' Histogram of `Age`
-ggplot(data, aes(x = Age)) +
-  geom_histogram(binwidth = 5, fill = "lightblue", color = "black") +
+ggplot(data, aes(x = Total_24hr_RBC)) +
+  geom_histogram(binwidth = 0.5, fill = "lightblue", color = "black") +
   labs(title = "Age Distribution of Patients", x = "Age", y = "Frequency") + 
   theme_minimal()
 
@@ -1213,5 +1213,83 @@ boxplot(ICU_LOS ~ Transfusion, data = data,
         ylab = "ICU Length of Stay (days)",
         col = c("lightblue", "tomato"),
         ylim = c(0, 25))
+
+
+
+
+#' The following are redos of the Lasso tables to include coefficients
+optimal_coefs <- coef(cv.lasso, s = "lambda.min")
+
+non_zero_coefs <- optimal_coefs[optimal_coefs[, 1] != 0, , drop = FALSE]
+non_zero_coefs <- non_zero_coefs[-1, , drop = FALSE]  
+
+lasso_class_table <- data.frame(
+  Predictors = rownames(non_zero_coefs),
+  Coefficient = as.numeric(non_zero_coefs)
+)
+
+lasso_class_table %>%
+  gt() %>%
+  tab_header(
+    title = "Lasso Classifiers - Final Selected Predictors with Coefficients"
+  ) %>%
+  cols_label(
+    Predictors = "Predictors",
+    Coefficient = "Coefficient"
+  ) %>%
+  fmt_number(
+    columns = c(Coefficient),
+    decimals = 4
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(everything())
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(50) 
+  )
+
+
+
+
+optimal_coefs22 <- coef(cv_lasso22, s = "lambda.min")
+
+non_zero_coefs22 <- optimal_coefs22[optimal_coefs22[, 1] != 0, , drop = FALSE]
+non_zero_coefs22 <- non_zero_coefs22[-1, , drop = FALSE]  
+
+lasso_reg_table <- data.frame(
+  Predictors = rownames(non_zero_coefs22),
+  Coefficient = as.numeric(non_zero_coefs22)
+)
+
+lasso_reg_table %>%
+  gt() %>%
+  tab_header(
+    title = "Lasso Regression - Final Selected Predictors with Coefficients"
+  ) %>%
+  cols_label(
+    Predictors = "Predictors",
+    Coefficient = "Coefficient"
+  ) %>%
+  fmt_number(
+    columns = c(Coefficient),
+    decimals = 4
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels(columns = everything())
+  ) %>%
+  tab_options(
+    table.font.size = "small",
+    table.width = pct(100)  
+  )
+
+data$Transfusion_numeric <- as.numeric(data$Transfusion) - 1
+# Calculate correlation
+correlation <- cor(data$Transfusion_numeric, data$Total_24hr_RBC, method = "pearson")
+
+# Print the correlation
+print(correlation)
 
 
