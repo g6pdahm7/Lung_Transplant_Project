@@ -21,7 +21,7 @@ library(tree)
 library(knitr)
 
 #' Uploading the data
-data <- read_excel("raw_data.xlsx")
+data <- read_excel("transfusion_data.xlsx")
 
 #' Remove unnecessary columns
 columns_to_remove <- c(
