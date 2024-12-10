@@ -22,6 +22,7 @@ library(knitr)
 
 #' Uploading the data
 data <- read_excel("transfusion_data.xlsx")
+names(data)
 
 #' Remove unnecessary columns
 columns_to_keep <- c("STUDY ID #", "OR Date","Type", "Gender (male)", "Height",
@@ -32,10 +33,11 @@ columns_to_keep <- c("STUDY ID #", "OR Date","Type", "Gender (male)", "Height",
                      "Pre_Platelets","Pre_PT","Pre_INR","Pre_PTT","Pre_Fibrinogen","Intraoperative ECLS",
                      "ECLS_CPB", "Intra_Fresh Frozen Plasma", "Intra_Packed Cells", "Intra_Platelets",
                      "Intra_Cryoprecipitate", "Duration of ICU Stay (days)", "DEATH_DATE", "ALIVE_30DAYS_YN", 
-                     "ALIVE_12MTHS_YN", "ICU_LOS", "HOSPITAL_LOS", "RBC 0-24hrs", "RBC 48-72hrs", 
+                     "ALIVE_90DAYS_YN", "ALIVE_12MTHS_YN", "ICU_LOS", "HOSPITAL_LOS", "RBC 0-24hrs", "RBC 48-72hrs",
+                     "RBC 24-48hrs", "Plt 24-48hrs",
                      "FFP 0-24hrs","FFP 24-48hrs","FFP 48-72hrs","FFP 72hr Total", "Plt 0-24hrs",
-                     "Plt 48-72hrs","Plt 72hr Total","Cryo 0-24hrs","Cryo 24-48hrs","Cryo 48-72hrs",
-                     "Cryo 72hr Total", "Total 24hr RBC", "Massive Transfusion"
+                     "Plt 48-72hrs","Plt 72hr Total","Cryo 0-24hrs","Cryo 24-48hrs","Cryo 48-72hrs","Pre_Hct", "Pre_Creatinine",
+                     "Cryo 72hr Total", "Total 24hr RBC", "Massive Transfusion", "LAS score", "ECLS_ECMO", "RBC 72hr Total"
 )
 
 #' Subset to include only the highlighted columns
@@ -262,7 +264,7 @@ kable(t(desc.transfusion), format = "html", digits = 2,
 
 #Summarize categorical transfusion data
 char.transfusion <- data.transfusion[, !sapply(data.transfusion, is.numeric), drop = FALSE]
-char.transfusion <- char.transfusion[,-c(1,17,22)] #remove OR date, death date, transfusion status
+char.transfusion <- char.transfusion[,-c(1,17,20)] #remove OR date, death date, transfusion status
 char.transfusion <- char.transfusion %>%
   mutate(across(everything(), as.character)) #ensure all cols are characters
 
@@ -868,7 +870,7 @@ auc_comparison_table %>%
     Average_AUC = "Average AUC"
   ) %>%
   fmt_number(
-    columns = vars(Average_AUC),
+    columns = c(Average_AUC),
     decimals = 3
   ) %>%
   tab_style(
