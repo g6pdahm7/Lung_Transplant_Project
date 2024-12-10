@@ -73,7 +73,7 @@ variable_categories %>%
 
 #' Remove unnecessary columns
 #' columns_to_remove <- c(
-#  "TX DB ID", "OR Date", "Coronary Artery Disease", "Hypertension",
+#  "TX DB ID", "Coronary Artery Disease", "Hypertension",
 #  "Diabetes (insulin)", "Diabetes (diet/OHGs)", "GERD/PUD", "Renal Failure",
 #  "Stroke/CVA", "Liver Disease", "Thyroid Disease", "DCD vs DBD",
 #  "Protamine (Y=1 N=0)", "Intra_Albumin 5% (mL)", "Intra_Crystalloid (mL)",
