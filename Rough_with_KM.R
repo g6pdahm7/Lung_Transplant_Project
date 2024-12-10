@@ -24,23 +24,22 @@ library(knitr)
 data <- read_excel("transfusion_data.xlsx")
 
 #' Remove unnecessary columns
-columns_to_remove <- c(
-  "TX DB ID", "Coronary Artery Disease", "Hypertension",
-  "Diabetes (insulin)", "Diabetes (diet/OHGs)", "GERD/PUD", "Renal Failure",
-  "Stroke/CVA", "Liver Disease", "Thyroid Disease", "DCD vs DBD",
-  "Protamine (Y=1 N=0)", "Intra_Albumin 5% (mL)", "Intra_Crystalloid (mL)",
-  "Intra_Cell Saver returned (mL)", "Intra_PCC/Octaplex", "Blood Loss",
-  "Urine Output", "Fluid Balance", "Tranexamic Acid Used",
-  "ICU Admission Date/Time", "ICU Discharge Date/Time", "Date of Extubation",
-  "Duration of Ventilation", "PostImmediate_PTT", "PostImmediate_Fibrinogen",
-  "PostImmediate_Creatinine", "PostDay1_Hb", "PostDay1_Hct",
-  "PostDay1_Platelets", "PostDay1_PT", "PostDay1_INR", "PostDay1_PTT",
-  "PostDay1_Fibrinogen", "PostDay1_Creatinine",
-  "Need for reoperation for bleeding within 24h"
+columns_to_keep <- c("STUDY ID #", "OR Date","Type", "Gender (male)", "Height",
+                     "Weight", "Age", "BMI","COPD", "alpha1-Antitrypsin Deficiency",
+                     "Cystic Fibrosis","Idiopathic Pulmonary Hypertension",
+                     "Interstitial Lung Disease","Pulm_Other", "First Lung Transplant",
+                     "Redo Lung Transplant", "ExVIVO Lung Perfusion","Preoperative ECLS","Pre_Hb",
+                     "Pre_Platelets","Pre_PT","Pre_INR","Pre_PTT","Pre_Fibrinogen","Intraoperative ECLS",
+                     "ECLS_CPB", "Intra_Fresh Frozen Plasma", "Intra_Packed Cells", "Intra_Platelets",
+                     "Intra_Cryoprecipitate", "Duration of ICU Stay (days)", "DEATH_DATE", "ALIVE_30DAYS_YN", 
+                     "ALIVE_12MTHS_YN", "ICU_LOS", "HOSPITAL_LOS", "RBC 0-24hrs", "RBC 48-72hrs", 
+                     "FFP 0-24hrs","FFP 24-48hrs","FFP 48-72hrs","FFP 72hr Total", "Plt 0-24hrs",
+                     "Plt 48-72hrs","Plt 72hr Total","Cryo 0-24hrs","Cryo 24-48hrs","Cryo 48-72hrs",
+                     "Cryo 72hr Total", "Total 24hr RBC", "Massive Transfusion"
 )
 
-#' Remove the columns
-data <- data %>% select(-all_of(columns_to_remove))
+#' Subset to include only the highlighted columns
+data <- data %>% select(columns_to_keep)
 
 #' Preliminary view of the data
 #View(data)
